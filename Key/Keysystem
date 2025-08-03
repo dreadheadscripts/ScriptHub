@@ -1,4 +1,5 @@
-local MainScript = [[
+-- Define your main script as a global string
+_G.MainScript = [[
 	local gui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
 	gui.Name = "MainScriptGUI"
 	local label = Instance.new("TextLabel", gui)
@@ -11,5 +12,5 @@ local MainScript = [[
 	label.TextScaled = true
 ]]
 
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Key/KeyConfig?token=GHSAT0AAAAAADH5VM3R5VLVSPWBAULOZR7C2EPJMJQ"))()
+-- Load and run the key system script after setting MainScript
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Key/KeyConfig.lua"))()
