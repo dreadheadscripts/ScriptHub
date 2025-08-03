@@ -301,7 +301,7 @@ function showKeyGUI()
 	end)
 
 	discord.MouseButton1Click:Connect(function()
-		setclipboard("https://discord.gg/BcwnjUYV")
+		setclipboard("https://discord.gg/8hYTmpTC")
 		notify("Copied", "Discord invite link copied to clipboard.")
 	end)
 
