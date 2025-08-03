@@ -1,5 +1,3 @@
-
-
 local MainScript = [[
 	local gui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
 	gui.Name = "MainScriptGUI"
@@ -13,6 +11,5 @@ local MainScript = [[
 	label.TextScaled = true
 ]]
 
--- Key System
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Key/KeyConfig?token=GHSAT0AAAAAADH5VM3R5VLVSPWBAULOZR7C2EPJMJQ"))()
