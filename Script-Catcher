@@ -1,0 +1,230 @@
+-- LocalScriptExplorer v1.1 - Complete Fixed Tool
+
+-- Setup
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local currentSearchQuery = ""
+local currentInventoryItems = {}
+local currentSelectedItem = nil
+local inventoryMode = "items"
+
+-- UI Helper
+local function makeDraggable(frame)
+	local dragging, dragStart, startPos
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	frame.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LocalScriptExplorer"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = PlayerGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 180, 0, 40)
+toggleButton.Position = UDim2.new(0.02, 0, 0.25, 0)
+toggleButton.Text = "📜 Show All Scripts"
+toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.SourceSansBold
+toggleButton.TextScaled = true
+toggleButton.Parent = screenGui
+makeDraggable(toggleButton)
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0.8, 0, 0.6, 0)
+mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame)
+makeDraggable(mainFrame)
+
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, -60, 0, 30)
+searchBox.Position = UDim2.new(0, 5, 0, 5)
+searchBox.PlaceholderText = "🔍 Search..."
+searchBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+searchBox.TextColor3 = Color3.new(1, 1, 1)
+searchBox.Font = Enum.Font.SourceSans
+searchBox.TextSize = 16
+searchBox.Text = ""
+searchBox.ClearTextOnFocus = false
+searchBox.Parent = mainFrame
+
+local tabFrame = Instance.new("Frame")
+tabFrame.Size = UDim2.new(1, 0, 0, 30)
+tabFrame.Position = UDim2.new(0, 0, 0, 35)
+tabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+tabFrame.Parent = mainFrame
+
+local allScriptsBtn = Instance.new("TextButton")
+allScriptsBtn.Size = UDim2.new(0.5, 0, 1, 0)
+allScriptsBtn.Text = "🧠 All Scripts"
+allScriptsBtn.Font = Enum.Font.SourceSansBold
+allScriptsBtn.TextScaled = true
+allScriptsBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+allScriptsBtn.TextColor3 = Color3.new(1, 1, 1)
+allScriptsBtn.Parent = tabFrame
+
+local invItemsBtn = Instance.new("TextButton")
+invItemsBtn.Size = UDim2.new(0.5, 0, 1, 0)
+invItemsBtn.Position = UDim2.new(0.5, 0, 0, 0)
+invItemsBtn.Text = "🎒 Inventory"
+invItemsBtn.Font = Enum.Font.SourceSansBold
+invItemsBtn.TextScaled = true
+invItemsBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+invItemsBtn.TextColor3 = Color3.new(1, 1, 1)
+invItemsBtn.Parent = tabFrame
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -10, 1, -75)
+scroll.Position = UDim2.new(0, 5, 0, 70)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.ScrollBarThickness = 8
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 4)
+layout.Parent = scroll
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextScaled = true
+closeBtn.Parent = mainFrame
+closeBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = false
+end)
+
+local backButton = Instance.new("TextButton")
+backButton.Size = UDim2.new(0, 80, 0, 30)
+backButton.Position = UDim2.new(0, 5, 0, 35)
+backButton.Text = "⬅ Back"
+backButton.Font = Enum.Font.SourceSansBold
+backButton.TextScaled = true
+backButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+backButton.TextColor3 = Color3.new(1, 1, 1)
+backButton.Visible = false
+backButton.Parent = mainFrame
+
+-- Source Viewer
+local function getSource(scriptObj)
+	local ok, result = pcall(function()
+		if getscriptsource then return getscriptsource(scriptObj)
+		elseif decompile then return decompile(scriptObj)
+		elseif getscriptbytecode then return "-- Bytecode: " .. tostring(getscriptbytecode(scriptObj))
+		else return scriptObj.Source end
+	end)
+	if ok and typeof(result) == "string" and #result > 0 then
+		return result
+	else
+		return "-- Unable to read source. Script may be protected or restricted."
+	end
+end
+
+local function showSource(scriptObj)
+	if screenGui:FindFirstChild("SourceViewer") then screenGui.SourceViewer:Destroy() end
+
+	local frame = Instance.new("Frame")
+	frame.Name = "SourceViewer"
+	frame.Size = UDim2.new(0.7, 0, 0.6, 0)
+	frame.Position = UDim2.new(0.15, 0, 0.2, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+	frame.Parent = screenGui
+	Instance.new("UICorner", frame)
+	makeDraggable(frame)
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -10, 0, 30)
+	title.Position = UDim2.new(0, 5, 0, 5)
+	title.BackgroundTransparency = 1
+	title.Text = "Viewing: " .. scriptObj.Name
+	title.TextColor3 = Color3.new(1, 1, 1)
+	title.Font = Enum.Font.SourceSansBold
+	title.TextScaled = true
+	title.Parent = frame
+
+	local scrollFrame = Instance.new("ScrollingFrame")
+	scrollFrame.Size = UDim2.new(1, -10, 1, -40)
+	scrollFrame.Position = UDim2.new(0, 5, 0, 35)
+	scrollFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+	scrollFrame.ScrollBarThickness = 8
+	scrollFrame.ScrollingDirection = Enum.ScrollingDirection.XY
+	scrollFrame.CanvasSize = UDim2.new(0, 2000, 0, 0)
+	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollFrame.BorderSizePixel = 0
+	scrollFrame.Parent = frame
+
+	local sourceLabel = Instance.new("TextLabel")
+	sourceLabel.Size = UDim2.new(0, 2000, 0, 0)
+	sourceLabel.BackgroundTransparency = 1
+	sourceLabel.TextColor3 = Color3.new(1, 1, 1)
+	sourceLabel.TextXAlignment = Enum.TextXAlignment.Left
+	sourceLabel.TextYAlignment = Enum.TextYAlignment.Top
+	sourceLabel.Font = Enum.Font.Code
+	sourceLabel.TextWrapped = false
+	sourceLabel.TextSize = 14
+	sourceLabel.AutomaticSize = Enum.AutomaticSize.Y
+	sourceLabel.Text = getSource(scriptObj)
+	sourceLabel.Parent = scrollFrame
+
+	scrollFrame.CanvasSize = UDim2.new(0, 2000, 0, sourceLabel.AbsoluteSize.Y + 20)
+
+	local close = Instance.new("TextButton")
+	close.Size = UDim2.new(0, 30, 0, 30)
+	close.Position = UDim2.new(1, -35, 0, 0)
+	close.Text = "X"
+	close.TextColor3 = Color3.new(1, 1, 1)
+	close.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+	close.Font = Enum.Font.SourceSansBold
+	close.TextScaled = true
+	close.Parent = frame
+	close.MouseButton1Click:Connect(function()
+		frame:Destroy()
+	end)
+
+	local copyButton = Instance.new("TextButton")
+	copyButton.Size = UDim2.new(0, 80, 0, 30)
+	copyButton.Position = UDim2.new(1, -120, 0, 0)
+	copyButton.Text = "📋 Copy"
+	copyButton.TextColor3 = Color3.new(1, 1, 1)
+	copyButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+	copyButton.Font = Enum.Font.SourceSansBold
+	copyButton.TextScaled = true
+	copyButton.Parent = frame
+	copyButton.MouseButton1Click:Connect(function()
+		local ok = pcall(function()
+			setclipboard(sourceLabel.Text)
+		end)
+		copyButton.Text = ok and "✅ Copied!" or "❌ Fail"
+		task.wait(1)
+		copyButton.Text = "📋 Copy"
+	end)
+end
