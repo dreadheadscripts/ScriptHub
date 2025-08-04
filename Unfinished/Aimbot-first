@@ -1,0 +1,515 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+
+-- Constants
+local MAX_DISTANCE = 500
+
+-- Position memory
+getfenv()._G.ScriptManiacGUI_TextPositions = getfenv()._G.ScriptManiacGUI_TextPositions or {
+    trackingTextPos = UDim2.new(0.5, -125, 0, 10),
+    closestTextPos = UDim2.new(0.5, -125, 0, 40),
+    mainFramePos = UDim2.new(0, 20, 0.3, 0)
+}
+
+-- Toggles
+local aimbotOn, opAimbotOn, espOn, crosshairOn = false, false, false, true
+local currentAimbotTarget = nil
+local espDots, lineToClosest = {}, nil
+
+-- Crosshair settings
+local crosshairColor = Color3.new(1, 1, 1)
+local crosshairSize = 6
+local crosshairThickness = 1
+local crosshairGap = 2
+local crosshairLines = {}
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "ScriptManiacGUI"
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 200, 0, 180)
+frame.Position = _G.ScriptManiacGUI_TextPositions.mainFramePos
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame)
+
+frame:GetPropertyChangedSignal("Position"):Connect(function()
+    _G.ScriptManiacGUI_TextPositions.mainFramePos = frame.Position
+    pcall(function()
+        writefile("ScriptManiac_Positions.json", HttpService:JSONEncode(_G.ScriptManiacGUI_TextPositions))
+    end)
+end)
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 20)
+title.Text = "Made by Script Maniac"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+local function createButton(name, yPos, callback)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 180, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Text = name .. ": Off"
+    Instance.new("UICorner", btn)
+
+    btn.MouseButton1Click:Connect(function()
+        callback()
+    end)
+
+    return btn
+end
+
+local function createDraggableText(position, color, key)
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 250, 0, 25)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Active = true
+    frame.Draggable = true
+
+    local textLabel = Instance.new("TextLabel", frame)
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = color
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 16
+    textLabel.Text = ""
+    textLabel.Visible = false
+
+    frame:GetPropertyChangedSignal("Position"):Connect(function()
+        _G.ScriptManiacGUI_TextPositions[key] = frame.Position
+        pcall(function()
+            writefile("ScriptManiac_Positions.json", HttpService:JSONEncode(_G.ScriptManiacGUI_TextPositions))
+        end)
+    end)
+
+    return textLabel
+end
+
+local trackingText = createDraggableText(_G.ScriptManiacGUI_TextPositions.trackingTextPos, Color3.new(0, 1, 0), "trackingTextPos")
+local closestText = createDraggableText(_G.ScriptManiacGUI_TextPositions.closestTextPos, Color3.new(1, 1, 0), "closestTextPos")
+
+-- Visuals
+local aimbotLine = Drawing.new("Line")
+aimbotLine.Visible = false
+aimbotLine.Color = Color3.new(0, 1, 0)
+aimbotLine.Thickness = 2
+
+local fovCircle = Drawing.new("Circle")
+fovCircle.Color = Color3.new(1, 1, 1)
+fovCircle.Thickness = 1
+fovCircle.Transparency = 0.5
+fovCircle.Radius = 300
+fovCircle.Filled = false
+fovCircle.Visible = true
+
+-- Crosshair creation
+local function createCrosshair()
+    local top = Drawing.new("Line")
+    local bottom = Drawing.new("Line")
+    local left = Drawing.new("Line")
+    local right = Drawing.new("Line")
+
+    for _, line in pairs({top, bottom, left, right}) do
+        line.Color = crosshairColor
+        line.Thickness = crosshairThickness
+        line.Visible = crosshairOn
+        line.Transparency = 1
+    end
+
+    crosshairLines.top = top
+    crosshairLines.bottom = bottom
+    crosshairLines.left = left
+    crosshairLines.right = right
+end
+
+createCrosshair()
+
+-- Helpers
+local function isAlive(player)
+    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+end
+
+local function canDamageYou(player)
+    if not player or player == LocalPlayer then return false end
+    local myTeam = LocalPlayer.Team
+    local theirTeam = player.Team
+    if myTeam == nil or theirTeam == nil then return true end
+    return myTeam ~= theirTeam
+end
+
+local function hasSpawnProtection(player)
+    local char = player.Character
+    if not char then return false end
+    if char:FindFirstChildOfClass("ForceField") then
+        return true
+    end
+    return false
+end
+
+local function canBeDamaged(player)
+    if not player or player == LocalPlayer then return false end
+    if not isAlive(player) then return false end
+    if not canDamageYou(player) then return false end
+    if hasSpawnProtection(player) then return false end
+    return true
+end
+
+local function isEnemy(player)
+    return canBeDamaged(player)
+end
+
+local function isVisible(position, character)
+    local origin = Camera.CFrame.Position
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local ray = workspace:Raycast(origin, (position - origin).Unit * 9999, rayParams)
+    return ray and character:IsAncestorOf(ray.Instance) or not ray
+end
+
+-- ESP
+local function ClearAllESP()
+    for _, hl in pairs(espDots) do if hl and hl:IsA("Highlight") then hl:Destroy() end end
+    espDots = {}
+    if lineToClosest then lineToClosest.Visible = false lineToClosest:Remove() lineToClosest = nil end
+    trackingText.Visible = false
+    closestText.Visible = false
+end
+
+local function EnableESP()
+    espOn = true
+    espButton.Text = "Esp: On"
+    espButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+end
+
+local function DisableESP()
+    espOn = false
+    ClearAllESP()
+    espButton.Text = "Esp: Off"
+    espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+end
+
+espButton = createButton("Esp", 25, function()
+    if espOn then DisableESP() else EnableESP() end
+end)
+
+-- Aimbot Button
+local aimbotButton = Instance.new("TextButton", frame)
+aimbotButton.Size = UDim2.new(0, 180, 0, 30)
+aimbotButton.Position = UDim2.new(0, 10, 0, 65)
+aimbotButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+aimbotButton.TextColor3 = Color3.new(1, 1, 1)
+aimbotButton.Font = Enum.Font.GothamBold
+aimbotButton.TextSize = 14
+aimbotButton.Text = "Aimbot: Off"
+Instance.new("UICorner", aimbotButton)
+aimbotButton.MouseButton1Click:Connect(function()
+    aimbotOn = not aimbotOn
+    currentAimbotTarget = nil
+    stopClicking()
+    aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
+    aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+end)
+
+-- Kill Aura Button
+local killAuraButton = Instance.new("TextButton", frame)
+killAuraButton.Size = UDim2.new(0, 180, 0, 30)
+killAuraButton.Position = UDim2.new(0, 10, 0, 105)
+killAuraButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+killAuraButton.TextColor3 = Color3.new(1, 1, 1)
+killAuraButton.Font = Enum.Font.GothamBold
+killAuraButton.TextSize = 14
+killAuraButton.Text = "Kill Aura: Off"
+Instance.new("UICorner", killAuraButton)
+killAuraButton.MouseButton1Click:Connect(function()
+    opAimbotOn = not opAimbotOn
+    currentAimbotTarget = nil
+    stopClicking()
+    killAuraButton.Text = "Kill Aura: " .. (opAimbotOn and "On" or "Off")
+    killAuraButton.BackgroundColor3 = opAimbotOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+end)
+
+-- Crosshair Button
+local crosshairButton = Instance.new("TextButton", frame)
+crosshairButton.Size = UDim2.new(0, 180, 0, 30)
+crosshairButton.Position = UDim2.new(0, 10, 0, 145)
+crosshairButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+crosshairButton.TextColor3 = Color3.new(1, 1, 1)
+crosshairButton.Font = Enum.Font.GothamBold
+crosshairButton.TextSize = 14
+crosshairButton.Text = "Crosshair: On"
+Instance.new("UICorner", crosshairButton)
+crosshairButton.MouseButton1Click:Connect(function()
+    crosshairOn = not crosshairOn
+    crosshairButton.Text = "Crosshair: " .. (crosshairOn and "On" or "Off")
+    crosshairButton.BackgroundColor3 = crosshairOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+    for _, line in pairs(crosshairLines) do
+        line.Visible = crosshairOn
+    end
+end)
+
+-- FOV & Crosshair update
+RunService.RenderStepped:Connect(function()
+    local cx, cy = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
+    fovCircle.Position = Vector2.new(cx, cy)
+
+    -- crosshair update
+    if crosshairOn then
+        -- top
+        crosshairLines.top.From = Vector2.new(cx, cy - crosshairGap - crosshairSize)
+        crosshairLines.top.To = Vector2.new(cx, cy - crosshairGap)
+        -- bottom
+        crosshairLines.bottom.From = Vector2.new(cx, cy + crosshairGap)
+        crosshairLines.bottom.To = Vector2.new(cx, cy + crosshairGap + crosshairSize)
+        -- left
+        crosshairLines.left.From = Vector2.new(cx - crosshairGap - crosshairSize, cy)
+        crosshairLines.left.To = Vector2.new(cx - crosshairGap, cy)
+        -- right
+        crosshairLines.right.From = Vector2.new(cx + crosshairGap, cy)
+        crosshairLines.right.To = Vector2.new(cx + crosshairGap + crosshairSize, cy)
+
+        for _, line in pairs(crosshairLines) do
+            line.Visible = true
+            line.Color = crosshairColor
+        end
+    else
+        for _, line in pairs(crosshairLines) do
+            line.Visible = false
+        end
+    end
+end)
+
+-- Auto Clicker Logic
+local clicking = false
+local cx, cy = Camera.ViewportSize.X, Camera.ViewportSize.Y
+local baseClickX, baseClickY = cx * 0.9, cy / 2
+
+local function getRandomOffset() return math.random(-3, 3), math.random(-3, 3) end
+
+local function safeSendClick(x, y)
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+        wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+    end)
+end
+
+local function startClicking()
+    if clicking then return end
+    clicking = true
+    spawn(function()
+        while clicking and currentAimbotTarget and isAlive(currentAimbotTarget) do
+            local offsetX, offsetY = getRandomOffset()
+            safeSendClick(baseClickX + offsetX, baseClickY + offsetY)
+            local jitter = math.random() * 0.001
+            wait(0.00001 + jitter)
+        end
+        clicking = false
+    end)
+end
+
+function stopClicking()
+    clicking = false
+end
+
+-- ESP refresh
+RunService.RenderStepped:Connect(function()
+    if not espOn then return end
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+    local closestEnemy, minDist = nil, math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and canBeDamaged(player) then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if dist <= MAX_DISTANCE then
+                    local hl = espDots[player]
+                    if not hl or not hl.Parent then
+                        if hl then hl:Destroy() end
+                        hl = Instance.new("Highlight")
+                        hl.Adornee = char
+                        hl.FillTransparency = 1
+                        hl.OutlineTransparency = 0
+                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        hl.Parent = gui
+                        espDots[player] = hl
+                    end
+                    hl.OutlineColor = (player == currentAimbotTarget and Color3.new(0, 1, 0)) or Color3.new(1, 0, 0)
+                    if dist < minDist then
+                        closestEnemy = player
+                        minDist = dist
+                    end
+                end
+            end
+        end
+    end
+
+    if closestEnemy then
+        closestText.Text = "Closest Enemy: " .. closestEnemy.Name .. " (" .. math.floor(minDist) .. " studs)"
+        closestText.Visible = true
+        local hrp = closestEnemy.Character and closestEnemy.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+            if not lineToClosest then
+                lineToClosest = Drawing.new("Line")
+                lineToClosest.Thickness = 1.5
+                lineToClosest.Color = Color3.new(1, 1, 0)
+                lineToClosest.Transparency = 1
+            end
+            lineToClosest.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            lineToClosest.To = Vector2.new(screenPos.X, screenPos.Y)
+            lineToClosest.Visible = true
+        end
+    else
+        closestText.Visible = false
+        if lineToClosest then lineToClosest.Visible = false end
+    end
+end)
+
+-- Aimbot Logic
+RunService.RenderStepped:Connect(function()
+    if not LocalPlayer.Character or not isAlive(LocalPlayer) then
+        currentAimbotTarget = nil
+        aimbotLine.Visible = false
+        trackingText.Text = "Tracking Nobody"
+        trackingText.Visible = true
+        stopClicking()
+        return
+    end
+
+    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return stopClicking() end
+
+    local closestPlayer, closestPart, bestVal = nil, nil, math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and canBeDamaged(player) then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
+                if distToPlayer <= MAX_DISTANCE then
+                    local head = char:FindFirstChild("Head")
+                    if opAimbotOn and head and isVisible(head.Position, char) then
+                        local dist = (head.Position - myHRP.Position).Magnitude
+                        if dist < bestVal then
+                            closestPlayer = player
+                            closestPart = head
+                            bestVal = dist
+                        end
+                    else
+                        for _, part in ipairs(char:GetChildren()) do
+                            if part:IsA("BasePart") and isVisible(part.Position, char) then
+                                local dist = (part.Position - myHRP.Position).Magnitude
+                                local screenPos = Camera:WorldToViewportPoint(part.Position)
+                                local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+
+                                if opAimbotOn and dist < bestVal then
+                                    closestPlayer = player
+                                    closestPart = part
+                                    bestVal = dist
+                                elseif aimbotOn and fov < fovCircle.Radius and fov < bestVal then
+                                    closestPlayer = player
+                                    closestPart = part
+                                    bestVal = fov
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if currentAimbotTarget ~= closestPlayer then
+        if not closestPlayer or not isAlive(closestPlayer) then
+            stopClicking()
+        elseif opAimbotOn then
+            startClicking()
+        else
+            stopClicking()
+        end
+    end
+
+    currentAimbotTarget = closestPlayer
+
+    if currentAimbotTarget and closestPart then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
+        local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
+        aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+        aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
+        aimbotLine.Visible = screenPos.Z > 0
+        trackingText.Text = "Tracking: " .. currentAimbotTarget.Name .. " (" .. math.floor((closestPart.Position - myHRP.Position).Magnitude) .. " studs)"
+        trackingText.Visible = true
+        if lineToClosest then lineToClosest.Visible = false end
+    else
+        aimbotLine.Visible = false
+        trackingText.Text = "Tracking Nobody"
+        trackingText.Visible = true
+        stopClicking()
+    end
+end)
+
+-- Respawn refresh
+LocalPlayer.CharacterAdded:Connect(function()
+    ClearAllESP()
+    currentAimbotTarget = nil
+    aimbotLine.Visible = false
+    stopClicking()
+end)
+
+-- ESP refresh on others respawning
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        if espOn then
+            wait(0.5)
+            ClearAllESP()
+        end
+    end)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            if espOn then
+                wait(0.5)
+                ClearAllESP()
+            end
+        end)
+    end
+end
+
+-- Crosshair toggle via C key
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.C then
+        crosshairOn = not crosshairOn
+        crosshairButton.Text = "Crosshair: " .. (crosshairOn and "On" or "Off")
+        crosshairButton.BackgroundColor3 = crosshairOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+        for _, line in pairs(crosshairLines) do
+            line.Visible = crosshairOn
+        end
+    end
+end)
