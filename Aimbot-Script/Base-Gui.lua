@@ -300,12 +300,20 @@ end)
 
 -- Load the AimbotButton script into the Combat tab
 local loadSuccess, loadError = pcall(function()
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
 end)
 if not loadSuccess then
-	warn("Failed to load AimbotButton.lua:", loadError)
+    warn("Failed to load AimbotButton.lua:", loadError)
 else
-	print("✅ AimbotButton.lua loaded and added to Combat tab.")
+    print("✅ AimbotButton.lua loaded and added to Combat tab.")
 end
 
-print("✅ Script Maniac Hub loaded, centered, draggable, and open button updated.") 
+-- Load the Crosshair script
+local crosshairSuccess, crosshairError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Crosshair.lua"))()
+end)
+if not crosshairSuccess then
+    warn("Failed to load Crosshair.lua:", crosshairError)
+else
+    print("✅ Crosshair.lua loaded successfully.")
+end
