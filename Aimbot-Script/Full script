@@ -1,6 +1,6 @@
 —Loading screen
 
-G_.LoadingScreenCode = [[
+_G.LoadingScreenCode = [[
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
 ]]
 
