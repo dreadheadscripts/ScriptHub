@@ -2,45 +2,86 @@
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Loading screen code as variable
-local Loading_Screen = [[
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
+-- Loading screen Lua code as a string variable
+local LoadingScreenCode = [[
+    local TweenService = game:GetService("TweenService")
+    local Players = game:GetService("Players")
+    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    local loadingGui = Instance.new("ScreenGui")
+    loadingGui.Name = "LoadingScreen"
+    loadingGui.ResetOnSpawn = false
+    loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    loadingGui.Parent = PlayerGui
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    bg.BackgroundTransparency = 0.4
+    bg.Parent = loadingGui
+
+    local loadingText = Instance.new("TextLabel")
+    loadingText.Size = UDim2.new(0, 400, 0, 50)
+    loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
+    loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
+    loadingText.BackgroundTransparency = 1
+    loadingText.TextColor3 = Color3.new(1, 1, 1)
+    loadingText.Font = Enum.Font.GothamBold
+    loadingText.TextSize = 24
+    loadingText.Text = "Initializing..."
+    loadingText.Parent = bg
+
+    local loadingSteps = {
+        "Loading Debugs...",
+        "Loading Bypasses...",
+        "Finalizing Setup...",
+        "Almost There..."
+    }
+
+    local function runLoadingSequence()
+        for _, step in ipairs(loadingSteps) do
+            loadingText.Text = step
+            task.wait(0.7)
+        end
+
+        local tweenBg = TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1})
+        local tweenText = TweenService:Create(loadingText, TweenInfo.new(1), {TextTransparency = 1})
+
+        tweenBg:Play()
+        tweenText:Play()
+        tweenBg.Completed:Wait()
+
+        loadingGui:Destroy()
+    end
+
+    task.spawn(runLoadingSequence)
 ]]
 
--- Run loading screen code
+-- Run the loading screen code
 local success, err = pcall(function()
-    loadstring(Loading_Screen)()
+    loadstring(LoadingScreenCode)()
 end)
 
 if not success then
     warn("Failed to run loading screen: " .. tostring(err))
 end
 
--- Wait for LoadingScreen GUI to appear, max 5 seconds
-local loadingGui = nil
-local timer = 0
-local maxWait = 5
-repeat
-    loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
-    if loadingGui then break end
-    task.wait(0.2)
-    timer = timer + 0.2
-until timer >= maxWait
-
-if loadingGui then
-    print("Loading screen detected, waiting for it to finish...")
-
-    -- Wait until loading screen GUI is destroyed (fades out)
-    while loadingGui.Parent do
+-- Wait until the loading GUI disappears before continuing
+local function waitForLoadingToFinish()
+    local timer = 0
+    local maxWait = 10
+    while timer < maxWait do
+        local loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
+        if not loadingGui then
+            break
+        end
         task.wait(0.2)
+        timer = timer + 0.2
     end
-    print("Loading screen finished.")
-else
-    warn("Loading screen GUI did not appear in time.")
 end
 
--- Now run your main GUI (your full GUI script here)
--- ... your main GUI code follows ...
+waitForLoadingToFinish()
+
 --// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
