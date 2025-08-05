@@ -1,103 +1,78 @@
---// Crosshair Button + Logic (GitHub-loaded)
-
-local RunService = game:GetService("RunService")
+--// Services
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Make sure Config tab exists
+--// Ensure Config tab exists
 local configTab = _G.Tabs and _G.Tabs.Config
-if not configTab then return warn("Config tab not found") end
+if not configTab then return warn("Config tab not found!") end
 
--- Crosshair state
-_G.CrosshairEnabled = false
-local crosshairColor = Color3.new(1, 1, 1)
+--// Crosshair Settings
+local crosshairColor = Color3.new(1, 1, 1) -- White
+local crosshairSize = 6
+local crosshairGap = 2
+local crosshairThickness = 1
+local crosshairOn = true -- ✅ Starts ON
 
--- Create Crosshair Toggle Button
-local crosshairBtn = Instance.new("TextButton")
-crosshairBtn.Size = UDim2.new(0, 150, 0, 40)
-crosshairBtn.Position = UDim2.new(0, 10, 0, 10)
-crosshairBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-crosshairBtn.TextColor3 = Color3.new(1, 1, 1)
-crosshairBtn.Font = Enum.Font.GothamBold
-crosshairBtn.TextSize = 18
-crosshairBtn.Text = "Crosshair: Off"
-crosshairBtn.Parent = configTab
-
-local corner = Instance.new("UICorner", crosshairBtn)
-corner.CornerRadius = UDim.new(0, 6)
-
--- Crosshair lines
-local crosshairGui = Instance.new("ScreenGui")
-crosshairGui.Name = "CrosshairGui"
-crosshairGui.ResetOnSpawn = false
-crosshairGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local size = 6
-local gap = 3
-local thickness = 2
-
-local function createLine()
-    local line = Instance.new("Frame")
-    line.AnchorPoint = Vector2.new(0.5, 0.5)
-    line.BackgroundColor3 = crosshairColor
-    line.BorderSizePixel = 0
-    line.Parent = crosshairGui
-    return line
-end
-
-local lines = {
-    top = createLine(),
-    bottom = createLine(),
-    left = createLine(),
-    right = createLine(),
+--// Drawing Crosshair
+local crosshair = {
+	top = Drawing.new("Line"),
+	bottom = Drawing.new("Line"),
+	left = Drawing.new("Line"),
+	right = Drawing.new("Line")
 }
 
--- Setup size and anchor of lines
-lines.top.Size = UDim2.new(0, thickness, 0, size)
-lines.top.AnchorPoint = Vector2.new(0.5, 1)
-
-lines.bottom.Size = UDim2.new(0, thickness, 0, size)
-lines.bottom.AnchorPoint = Vector2.new(0.5, 0)
-
-lines.left.Size = UDim2.new(0, size, 0, thickness)
-lines.left.AnchorPoint = Vector2.new(1, 0.5)
-
-lines.right.Size = UDim2.new(0, size, 0, thickness)
-lines.right.AnchorPoint = Vector2.new(0, 0.5)
-
-local function updateCrosshair()
-    local cx, cy = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
-
-    lines.top.Position = UDim2.new(0, cx, 0, cy - gap)
-    lines.bottom.Position = UDim2.new(0, cx, 0, cy + gap)
-    lines.left.Position = UDim2.new(0, cx - gap, 0, cy)
-    lines.right.Position = UDim2.new(0, cx + gap, 0, cy)
-
-    for _, line in pairs(lines) do
-        line.BackgroundColor3 = crosshairColor
-        line.Visible = _G.CrosshairEnabled
-    end
+for _, line in pairs(crosshair) do
+	line.Color = crosshairColor
+	line.Thickness = crosshairThickness
+	line.Transparency = 1
+	line.Visible = crosshairOn
 end
 
--- Toggle Button Logic
-crosshairBtn.MouseButton1Click:Connect(function()
-    _G.CrosshairEnabled = not _G.CrosshairEnabled
-    crosshairBtn.Text = "Crosshair: " .. (_G.CrosshairEnabled and "On" or "Off")
-    crosshairBtn.BackgroundColor3 = _G.CrosshairEnabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(45, 45, 55)
-    updateCrosshair()
+--// Create Toggle Button in Config Tab
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 160, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- ✅ Green when ON
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 18
+toggleBtn.Text = "Crosshair: On"
+toggleBtn.Parent = configTab
+
+local corner = Instance.new("UICorner", toggleBtn)
+corner.CornerRadius = UDim.new(0, 6)
+
+--// Toggle Handler
+toggleBtn.MouseButton1Click:Connect(function()
+	crosshairOn = not crosshairOn
+	toggleBtn.Text = crosshairOn and "Crosshair: On" or "Crosshair: Off"
+	toggleBtn.BackgroundColor3 = crosshairOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(50, 50, 60)
+
+	for _, line in pairs(crosshair) do
+		line.Visible = crosshairOn
+	end
 end)
 
--- Update crosshair every frame if enabled
+--// Constant Refresher
 RunService.RenderStepped:Connect(function()
-    if _G.CrosshairEnabled then
-        updateCrosshair()
-    else
-        for _, line in pairs(lines) do
-            line.Visible = false
-        end
-    end
-end)
+	local cx, cy = Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2
 
--- Initially hide crosshair
-updateCrosshair()
+	crosshair.top.From = Vector2.new(cx, cy - crosshairGap - crosshairSize)
+	crosshair.top.To = Vector2.new(cx, cy - crosshairGap)
+
+	crosshair.bottom.From = Vector2.new(cx, cy + crosshairGap)
+	crosshair.bottom.To = Vector2.new(cx, cy + crosshairGap + crosshairSize)
+
+	crosshair.left.From = Vector2.new(cx - crosshairGap - crosshairSize, cy)
+	crosshair.left.To = Vector2.new(cx - crosshairGap, cy)
+
+	crosshair.right.From = Vector2.new(cx + crosshairGap, cy)
+	crosshair.right.To = Vector2.new(cx + crosshairGap + crosshairSize, cy)
+
+	-- Refresh visibility
+	for _, line in pairs(crosshair) do
+		line.Visible = crosshairOn
+	end
+end)
