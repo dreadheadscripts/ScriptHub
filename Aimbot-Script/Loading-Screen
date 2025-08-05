@@ -1,58 +1,157 @@
---// Services
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local LoadingScreenCode = [[
+    local TweenService = game:GetService("TweenService")
+    local Players = game:GetService("Players")
+    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    local loadingGui = Instance.new("ScreenGui")
+    loadingGui.Name = "LoadingScreen"
+    loadingGui.ResetOnSpawn = false
+    loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    loadingGui.Parent = PlayerGui
 
---// Loading Screen GUI
-local loadingGui = Instance.new("ScreenGui")
-loadingGui.Name = "LoadingScreen"
-loadingGui.ResetOnSpawn = false
-loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-loadingGui.Parent = PlayerGui
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    bg.BackgroundTransparency = 0.4
+    bg.Parent = loadingGui
 
-local bg = Instance.new("Frame")
-bg.Size = UDim2.new(1, 0, 1, 0)
-bg.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-bg.BackgroundTransparency = 0.4
-bg.Parent = loadingGui
+    local loadingText = Instance.new("TextLabel")
+    loadingText.Size = UDim2.new(0, 400, 0, 50)
+    loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
+    loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
+    loadingText.BackgroundTransparency = 1
+    loadingText.TextColor3 = Color3.new(1, 1, 1)
+    loadingText.Font = Enum.Font.GothamBold
+    loadingText.TextSize = 24
+    loadingText.Text = "Initializing..."
+    loadingText.Parent = bg
 
-local loadingText = Instance.new("TextLabel")
-loadingText.Size = UDim2.new(0, 400, 0, 50)
-loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
-loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
-loadingText.BackgroundTransparency = 1
-loadingText.TextColor3 = Color3.new(1, 1, 1)
-loadingText.Font = Enum.Font.GothamBold
-loadingText.TextSize = 24
-loadingText.Text = "Initializing..."
-loadingText.Parent = bg
+    -- Debug functions
+    local function debugCheck1()
+        print("Debug: Checking client integrity...")
+        task.wait(0.4)
+        -- Your debug logic here
+    end
 
---// Loading Steps (Debugs, Bypasses etc)
-local loadingSteps = {
-	"Loading Debugs...",
-	"Loading Bypasses...",
-	"Finalizing Setup...",
-	"Almost There..."
-}
+    local function debugCheck2()
+        print("Debug: Validating script environment...")
+        task.wait(0.3)
+        -- Your debug logic here
+    end
 
---// Run loading sequence and fade out
-local function runLoadingSequence()
-	for _, step in ipairs(loadingSteps) do
-		loadingText.Text = step
-		wait(0.7) -- Adjust timing as needed for each step
-	end
+    local function debugCheck3()
+        print("Debug: Monitoring game events...")
+        task.wait(0.5)
+        -- Your debug logic here
+    end
 
-	-- Fade out animation
-	local tweenBg = TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1})
-	local tweenText = TweenService:Create(loadingText, TweenInfo.new(1), {TextTransparency = 1})
+    -- Bypass functions
+    local function bypassStep1()
+        print("Bypass: Circumventing anti-cheat 1...")
+        task.wait(0.5)
+        -- Your bypass logic here
+    end
 
-	tweenBg:Play()
-	tweenText:Play()
-	tweenBg.Completed:Wait()
+    local function bypassStep2()
+        print("Bypass: Evading server checks...")
+        task.wait(0.4)
+        -- Your bypass logic here
+    end
 
-	loadingGui:Destroy()
-end
+    local function bypassStep3()
+        print("Bypass: Spoofing network traffic...")
+        task.wait(0.6)
+        -- Your bypass logic here
+    end
 
--- Start loading
-task.spawn(runLoadingSequence)
+    local function bypassStep4()
+        print("Bypass: Masking script behavior...")
+        task.wait(0.4)
+        -- Your bypass logic here
+    end
+
+    -- Refresher functions
+    local function refresherTick1()
+        print("Refresher: Updating ESP...")
+        task.wait(0.3)
+        -- Your refresher logic here
+    end
+
+    local function refresherTick2()
+        print("Refresher: Syncing aimbot targets...")
+        task.wait(0.3)
+        -- Your refresher logic here
+    end
+
+    local function refresherTick3()
+        print("Refresher: Healing player if needed...")
+        task.wait(0.3)
+        -- Your refresher logic here
+    end
+
+    -- Finalization
+    local function finalizeSetup()
+        print("Finalizing setup...")
+        task.wait(0.6)
+        -- Your final setup here
+    end
+
+    local function almostThere()
+        print("Almost done...")
+        task.wait(0.4)
+        -- Last touches
+    end
+
+    -- Loading steps with grouped functions
+    local loadingSteps = {
+        {text = "Loading Debugs...", func = function()
+            debugCheck1()
+            debugCheck2()
+            debugCheck3()
+        end},
+        {text = "Loading Bypasses...", func = function()
+            bypassStep1()
+            bypassStep2()
+            bypassStep3()
+            bypassStep4()
+        end},
+        {text = "Refreshing Data...", func = function()
+            refresherTick1()
+            refresherTick2()
+            refresherTick3()
+        end},
+        {text = "Finalizing Setup...", func = finalizeSetup},
+        {text = "Almost There...", func = almostThere}
+    }
+
+    -- Refresher loop that runs constantly after loading
+    local function refresherLoop()
+        while true do
+            refresherTick1()
+            refresherTick2()
+            refresherTick3()
+            task.wait(1) -- Adjust refresher interval here
+        end
+    end
+
+    local function runLoadingSequence()
+        for _, step in ipairs(loadingSteps) do
+            loadingText.Text = step.text
+            step.func()
+        end
+
+        local tweenBg = TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1})
+        local tweenText = TweenService:Create(loadingText, TweenInfo.new(1), {TextTransparency = 1})
+
+        tweenBg:Play()
+        tweenText:Play()
+        tweenBg.Completed:Wait()
+
+        -- Start refresher loop in background
+        task.spawn(refresherLoop)
+
+        loadingGui:Destroy()
+    end
+
+    task.spawn(runLoadingSequence)
+]]
