@@ -1,1 +1,58 @@
+--// Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+--// Loading Screen GUI
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "LoadingScreen"
+loadingGui.ResetOnSpawn = false
+loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+loadingGui.Parent = PlayerGui
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+bg.BackgroundTransparency = 0.4
+bg.Parent = loadingGui
+
+local loadingText = Instance.new("TextLabel")
+loadingText.Size = UDim2.new(0, 400, 0, 50)
+loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
+loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
+loadingText.BackgroundTransparency = 1
+loadingText.TextColor3 = Color3.new(1, 1, 1)
+loadingText.Font = Enum.Font.GothamBold
+loadingText.TextSize = 24
+loadingText.Text = "Initializing..."
+loadingText.Parent = bg
+
+--// Loading Steps (Debugs, Bypasses etc)
+local loadingSteps = {
+	"Loading Debugs...",
+	"Loading Bypasses...",
+	"Finalizing Setup...",
+	"Almost There..."
+}
+
+--// Run loading sequence and fade out
+local function runLoadingSequence()
+	for _, step in ipairs(loadingSteps) do
+		loadingText.Text = step
+		wait(0.7) -- Adjust timing as needed for each step
+	end
+
+	-- Fade out animation
+	local tweenBg = TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1})
+	local tweenText = TweenService:Create(loadingText, TweenInfo.new(1), {TextTransparency = 1})
+
+	tweenBg:Play()
+	tweenText:Play()
+	tweenBg.Completed:Wait()
+
+	loadingGui:Destroy()
+end
+
+-- Start loading
+task.spawn(runLoadingSequence)
