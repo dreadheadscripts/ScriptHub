@@ -1,3 +1,39 @@
+--// Loading screen code as a variable (GitHub raw Lua)
+local Loading_Screen = [[
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
+]]
+
+-- Execute the loading screen
+local success, err = pcall(function()
+    loadstring(Loading_Screen)()
+end)
+
+if not success then
+    warn("❌ Failed to run loading screen: " .. tostring(err))
+end
+
+-- Optional wait so loading screen finishes before GUI shows
+task.wait(3.5)
+
+--// Your existing main GUI code below
+
+--// Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "ScriptManiacHub"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+gui.Parent = PlayerGui
+
+-- (Your full main GUI code continues exactly as before)
+
 --// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
