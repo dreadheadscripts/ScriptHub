@@ -320,11 +320,11 @@ end
 
 -- Load the ESP script into the Player tab
 local espSuccess, espError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/yourusername/yourrepo/main/esp.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Esp.lua"))()
 end)
 
 if not espSuccess then
-    warn("Failed to load esp.lua:", espError)
+    warn("Failed to load Esp.lua:", espError)
 else
-    print("✅ esp.lua loaded successfully into Player tab.")
+    print("✅ Esp.lua loaded successfully into Player tab.")
 end
