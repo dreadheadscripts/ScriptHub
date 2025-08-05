@@ -6,25 +6,6 @@ local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local LoadingScreenCode = [[
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen?token=GHSAT0AAAAAADH5VM3QYLTH3H7ZBN5IB3422ESMNAA
 "))()
-    }
-
-    local function runLoadingSequence()
-        for _, step in ipairs(loadingSteps) do
-            loadingText.Text = step
-            task.wait(0.7)
-        end
-
-        local tweenBg = TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1})
-        local tweenText = TweenService:Create(loadingText, TweenInfo.new(1), {TextTransparency = 1})
-
-        tweenBg:Play()
-        tweenText:Play()
-        tweenBg.Completed:Wait()
-
-        loadingGui:Destroy()
-    end
-
-    task.spawn(runLoadingSequence)
 ]]
 
 -- Run the loading screen code
