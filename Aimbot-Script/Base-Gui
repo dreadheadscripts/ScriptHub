@@ -4,38 +4,8 @@ local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Loading screen Lua code as a string variable
 local LoadingScreenCode = [[
-    local TweenService = game:GetService("TweenService")
-    local Players = game:GetService("Players")
-    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-
-    local loadingGui = Instance.new("ScreenGui")
-    loadingGui.Name = "LoadingScreen"
-    loadingGui.ResetOnSpawn = false
-    loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    loadingGui.Parent = PlayerGui
-
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    bg.BackgroundTransparency = 0.4
-    bg.Parent = loadingGui
-
-    local loadingText = Instance.new("TextLabel")
-    loadingText.Size = UDim2.new(0, 400, 0, 50)
-    loadingText.Position = UDim2.new(0.5, 0, 0.5, 0)
-    loadingText.AnchorPoint = Vector2.new(0.5, 0.5)
-    loadingText.BackgroundTransparency = 1
-    loadingText.TextColor3 = Color3.new(1, 1, 1)
-    loadingText.Font = Enum.Font.GothamBold
-    loadingText.TextSize = 24
-    loadingText.Text = "Initializing..."
-    loadingText.Parent = bg
-
-    local loadingSteps = {
-        "Loading Debugs...",
-        "Loading Bypasses...",
-        "Finalizing Setup...",
-        "Almost There..."
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen?token=GHSAT0AAAAAADH5VM3QYLTH3H7ZBN5IB3422ESMNAA
+"))()
     }
 
     local function runLoadingSequence()
