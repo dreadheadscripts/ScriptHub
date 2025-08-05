@@ -1,22 +1,53 @@
-local SimpleLoadingScreen = [[
- game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen")
+--// Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Loading screen code stored as a string variable
+local LoadingScreenCode = [[
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))(
 ]]
 
--- To run the loading screen:
+-- Execute the loading screen
 local success, err = pcall(function()
-    loadstring(SimpleLoadingScreen)()
+    loadstring(LoadingScreenCode)()
 end)
 
 if not success then
     warn("Failed to load loading screen:", err)
 end
 
---// Services
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+-- Wait for the loading screen GUI to appear
+local loadingGui = nil
+local timeout = 10
+local timer = 0
+while timer < timeout do
+    loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
+    if loadingGui then
+        print("✅ Found LoadingScreen GUI")
+        break
+    end
+    task.wait(0.5)
+    timer = timer + 0.5
+end
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+if not loadingGui then
+    warn("❌ LoadingScreen GUI never appeared, skipping wait.")
+end
+
+-- Wait for loading screen to finish (destroyed)
+if loadingGui then
+    print("Waiting for LoadingScreen to finish...")
+    while loadingGui.Parent do
+        task.wait(0.5)
+    end
+    print("✅ LoadingScreen GUI destroyed, proceeding.")
+end
+
+-- Now create the main Script Maniac Hub GU
 
 --// GUI
 local gui = Instance.new("ScreenGui")
