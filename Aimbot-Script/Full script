@@ -1,7 +1,8 @@
 —Loading screen
 
-Local Loadingscreen = [[loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen?token=GHSAT0AAAAAADH5VM3QEQH2WROOGE7Y4YYM2ERSA3Q
-"))()]]
+local LoadingScreenCode = [[
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
+]]
 
 —Mainscript
 
