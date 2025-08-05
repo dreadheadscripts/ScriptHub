@@ -317,3 +317,14 @@ if not crosshairSuccess then
 else
     print("✅ Crosshair.lua loaded successfully.")
 end
+
+-- Load the ESP script into the Player tab
+local espSuccess, espError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/yourusername/yourrepo/main/esp.lua"))()
+end)
+
+if not espSuccess then
+    warn("Failed to load esp.lua:", espError)
+else
+    print("✅ esp.lua loaded successfully into Player tab.")
+end
