@@ -1,22 +1,46 @@
---// Loading screen code as a variable (GitHub raw Lua)
+-- Services
+local Players = game:GetService("Players")
+local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Loading screen code as variable
 local Loading_Screen = [[
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
 ]]
 
--- Execute the loading screen
+-- Run loading screen code
 local success, err = pcall(function()
     loadstring(Loading_Screen)()
 end)
 
 if not success then
-    warn("❌ Failed to run loading screen: " .. tostring(err))
+    warn("Failed to run loading screen: " .. tostring(err))
 end
 
--- Optional wait so loading screen finishes before GUI shows
-task.wait(3.5)
+-- Wait for LoadingScreen GUI to appear, max 5 seconds
+local loadingGui = nil
+local timer = 0
+local maxWait = 5
+repeat
+    loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
+    if loadingGui then break end
+    task.wait(0.2)
+    timer = timer + 0.2
+until timer >= maxWait
 
---// Your existing main GUI code below
+if loadingGui then
+    print("Loading screen detected, waiting for it to finish...")
 
+    -- Wait until loading screen GUI is destroyed (fades out)
+    while loadingGui.Parent do
+        task.wait(0.2)
+    end
+    print("Loading screen finished.")
+else
+    warn("Loading screen GUI did not appear in time.")
+end
+
+-- Now run your main GUI (your full GUI script here)
+-- ... your main GUI code follows ...
 --// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
