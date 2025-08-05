@@ -7,9 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Loading screen code stored as a string variable
-local LoadingScreenCode = [[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
-]]
+
 
 -- Execute the loading screen
 local success, err = pcall(function()
