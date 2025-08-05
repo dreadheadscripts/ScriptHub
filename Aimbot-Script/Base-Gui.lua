@@ -47,7 +47,7 @@ if loadingGui then
     print("✅ LoadingScreen GUI destroyed, proceeding.")
 end
 
--- Now create the main Script Maniac Hub GU
+-- Now create the main Script Maniac Hub GUI
 
 --// GUI
 local gui = Instance.new("ScreenGui")
@@ -250,6 +250,9 @@ for name, frame in pairs(tabs) do
 	label.Parent = frame
 end
 
+-- Expose tabs globally so external scripts can access them
+_G.Tabs = tabs
+
 --// Tab Switch Logic
 local function switchTo(tabName)
 	for name, frame in pairs(tabs) do
@@ -286,13 +289,23 @@ for name in pairs(tabs) do
 	end)
 end
 
---// Show first tab by default
+-- Show first tab by default
 switchTo("Combat")
 
---// Close button logic
+-- Close button logic
 closeButton.MouseButton1Click:Connect(function()
 	mainFrame.Visible = false
 	openButton.Visible = true
 end)
 
-print("✅ Script Maniac Hub loaded, centered, draggable, and open button updated.")
+-- Load the AimbotButton script into the Combat tab
+local loadSuccess, loadError = pcall(function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
+end)
+if not loadSuccess then
+	warn("Failed to load AimbotButton.lua:", loadError)
+else
+	print("✅ AimbotButton.lua loaded and added to Combat tab.")
+end
+
+print("✅ Script Maniac Hub loaded, centered, draggable, and open button updated.") 
