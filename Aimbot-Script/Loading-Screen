@@ -1,5 +1,4 @@
-local LoadingScreenCode = [[
-    local TweenService = game:GetService("TweenService")
+   local TweenService = game:GetService("TweenService")
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
@@ -154,4 +153,3 @@ local LoadingScreenCode = [[
     end
 
     task.spawn(runLoadingSequence)
-]]
