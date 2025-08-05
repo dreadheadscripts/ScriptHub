@@ -1,37 +1,43 @@
--- Services
+--// Services
 local Players = game:GetService("Players")
 local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Loading screen Lua code as a string variable
-local LoadingScreenCode = [[
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen?token=GHSAT0AAAAAADH5VM3QYLTH3H7ZBN5IB3422ESMNAA
-"))()
-]]
+--// Loading Screen (as variable, properly executing)
+local LoadingScreenCode = game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Loading-Screen")
 
--- Run the loading screen code
+-- Execute loading screen
 local success, err = pcall(function()
     loadstring(LoadingScreenCode)()
 end)
 
 if not success then
-    warn("Failed to run loading screen: " .. tostring(err))
+    warn("❌ Failed to run loading screen: " .. tostring(err))
 end
 
--- Wait until the loading GUI disappears before continuing
+-- Optional: wait for the loading screen to complete
 local function waitForLoadingToFinish()
     local timer = 0
     local maxWait = 10
     while timer < maxWait do
         local loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
-        if not loadingGui then
-            break
-        end
+        if not loadingGui then break end
         task.wait(0.2)
-        timer = timer + 0.2
+        timer += 0.2
     end
 end
 
 waitForLoadingToFinish()
+
+--// Load Main GUI
+local MainGuiCode = game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Base-Gui")
+
+local guiSuccess, guiErr = pcall(function()
+    loadstring(MainGuiCode)()
+end)
+
+if not guiSuccess then
+    warn("❌ Failed to load main GUI: " .. tostring(guiErr))
+end
 
 --// Services
 local Players = game:GetService("Players")
