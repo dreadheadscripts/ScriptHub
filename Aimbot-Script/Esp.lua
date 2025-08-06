@@ -1,34 +1,34 @@
---// Services
+--// ESP SCRIPT (Player Tab)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
---// Tabs reference
+-- Make sure Player tab exists
 local playerTab = _G.Tabs and _G.Tabs.Player
-if not playerTab then return warn("Player tab missing") end
+if not playerTab then return warn("Player tab not found") end
 
---// Globals
+-- Globals
 _G.ESPEnabled = true
-_G.TargetTracking = nil -- Set by aimbot/kill aura
 local highlights = {}
-local closestEnemy = nil
-local tracerLine = nil
+local closestLabel = nil
+local trackingLine = nil
+local previousClosest = nil
 
---// ESP Toggle Button
+-- ESP Button
 local espBtn = Instance.new("TextButton")
 espBtn.Size = UDim2.new(0, 150, 0, 40)
 espBtn.Position = UDim2.new(0, 10, 0, 60)
-espBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-espBtn.Text = "ESP: On"
+espBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- green = on
 espBtn.TextColor3 = Color3.new(1, 1, 1)
 espBtn.Font = Enum.Font.GothamBold
 espBtn.TextSize = 18
+espBtn.Text = "ESP: On"
 espBtn.Parent = playerTab
 
-Instance.new("UICorner", espBtn).CornerRadius = UDim.new(0, 6)
+local corner = Instance.new("UICorner", espBtn)
+corner.CornerRadius = UDim.new(0, 6)
 
 espBtn.MouseButton1Click:Connect(function()
 	_G.ESPEnabled = not _G.ESPEnabled
@@ -36,115 +36,191 @@ espBtn.MouseButton1Click:Connect(function()
 	espBtn.BackgroundColor3 = _G.ESPEnabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(45, 45, 55)
 
 	if not _G.ESPEnabled then
-		for _, h in pairs(highlights) do if h then h:Destroy() end end
+		for _, h in pairs(highlights) do
+			if h and h.Parent then h:Destroy() end
+		end
 		highlights = {}
-		if tracerLine then tracerLine:Remove() tracerLine = nil end
+		if closestLabel then closestLabel.Visible = false end
+		if trackingLine then
+			trackingLine:Destroy()
+			trackingLine = nil
+		end
+		previousClosest = nil
 	end
 end)
 
---// Utilities
-local function isEnemy(player)
-	if player == LocalPlayer then return false end
-	if not player.Team or not LocalPlayer.Team then return true end
-	return player.Team ~= LocalPlayer.Team
-end
+-- Closest Label
+closestLabel = Instance.new("TextLabel")
+closestLabel.Size = UDim2.new(0, 200, 0, 25)
+closestLabel.Position = UDim2.new(0.5, -100, 0.8, 0)
+closestLabel.AnchorPoint = Vector2.new(0.5, 0)
+closestLabel.BackgroundTransparency = 1
+closestLabel.TextColor3 = Color3.new(1, 1, 1)
+closestLabel.TextStrokeTransparency = 0
+closestLabel.Font = Enum.Font.GothamBold
+closestLabel.TextSize = 20
+closestLabel.Text = ""
+closestLabel.Visible = true
+closestLabel.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Helper functions
 local function isAlive(player)
-	local human = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	return human and human.Health > 0
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	return humanoid and humanoid.Health > 0
 end
 
 local function hasSpawnProtection(player)
-	return player.Character and player.Character:FindFirstChild("ForceField")
+	return player.Character and player.Character:FindFirstChildOfClass("ForceField") ~= nil
 end
 
-local function getRoot(player)
-	return player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+local function canDamageYou(player)
+	local myTeam = LocalPlayer.Team
+	local theirTeam = player.Team
+	if not myTeam or not theirTeam then return true end
+	return myTeam ~= theirTeam
 end
 
-local function createHighlight(player)
-	local hl = Instance.new("Highlight")
-	hl.Name = "ESP_Highlight"
-	hl.FillTransparency = 1
-	hl.OutlineTransparency = 0
-	hl.OutlineColor = Color3.fromRGB(255, 0, 0)
-	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	hl.Adornee = player.Character
-	hl.Parent = game:GetService("CoreGui")
-	return hl
+local function isValidTarget(player)
+	if player == LocalPlayer then return false end
+	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+	if not canDamageYou(player) then return false end
+	-- ESP should appear on enemies even if dead or spawn protected
+	return true
 end
 
+local function isVisible(part)
+	local origin = Camera.CFrame.Position
+	local direction = (part.Position - origin).Unit * 500
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+	local result = workspace:Raycast(origin, direction, raycastParams)
+	return not result or (result.Instance and result.Instance:IsDescendantOf(part.Parent))
+end
+
+-- Refresh ESP highlight for player
+local function refreshPlayerHighlight(player)
+	if highlights[player] then
+		highlights[player]:Destroy()
+		highlights[player] = nil
+	end
+
+	if not isValidTarget(player) then return end
+
+	local char = player.Character
+	if not char then return end
+
+	local highlight = Instance.new("Highlight")
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0
+	highlight.OutlineColor = Color3.fromRGB(255, 0, 0) -- red default
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Adornee = char
+	highlight.Parent = game:GetService("CoreGui")
+
+	highlights[player] = highlight
+end
+
+-- Draw or update tracking line to closest player
+local function updateTrackingLine(target)
+	if trackingLine then
+		trackingLine:Destroy()
+		trackingLine = nil
+	end
+	if not target or not target.Character then return end
+	local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+	local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp or not localHRP then return end
+
+	local line = Drawing and Drawing.new and Drawing.new("Line") or nil
+	if not line then return end
+	trackingLine = line
+	line.Color = Color3.fromRGB(255, 255, 0)
+	line.Thickness = 2
+	line.Transparency = 1
+
+	-- Update line position every frame
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		if not _G.ESPEnabled or not target.Character or not localHRP.Parent then
+			line:Remove()
+			conn:Disconnect()
+			trackingLine = nil
+			return
+		end
+		local vectorFrom = Camera:WorldToViewportPoint(localHRP.Position)
+		local vectorTo = Camera:WorldToViewportPoint(hrp.Position)
+		line.From = Vector2.new(vectorFrom.X, vectorFrom.Y)
+		line.To = Vector2.new(vectorTo.X, vectorTo.Y)
+	end)
+end
+
+-- Update ESP and closest tracking
 local function updateESP()
 	if not _G.ESPEnabled then return end
-	local myHRP = getRoot(LocalPlayer)
-	if not myHRP then return end
+	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
 
 	local closestDist = math.huge
-	local closestPlr = nil
+	local closestPlayer = nil
 
-	for _, plr in ipairs(Players:GetPlayers()) do
-		local hrp = getRoot(plr)
-		if hrp and isEnemy(plr) and not hasSpawnProtection(plr) then
-			local dist = (myHRP.Position - hrp.Position).Magnitude
-			if dist < closestDist then
-				closestDist = dist
-				closestPlr = plr
-			end
-
-			if not highlights[plr] then
-				highlights[plr] = createHighlight(plr)
-			end
-
-			local tracking = (_G.TargetTracking == plr)
-			local color = Color3.fromRGB(255, 0, 0)
-			if plr == closestPlr then
-				color = Color3.fromRGB(255, 255, 0) -- Yellow if closest
-			elseif tracking then
-				color = Color3.fromRGB(0, 255, 0) -- Green if tracking
-			end
-
-			highlights[plr].OutlineColor = color
-		else
-			if highlights[plr] then
-				highlights[plr]:Destroy()
-				highlights[plr] = nil
+	for _, player in pairs(Players:GetPlayers()) do
+		if isValidTarget(player) then
+			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if hrp and isVisible(hrp) then
+				local dist = (LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+				if dist < closestDist then
+					closestDist = dist
+					closestPlayer = player
+				end
 			end
 		end
 	end
 
-	-- Tracking line
-	if tracerLine then tracerLine:Remove() tracerLine = nil end
-	if closestPlr and _G.ESPEnabled then
-		local enemyHRP = getRoot(closestPlr)
-		if enemyHRP then
-			tracerLine = Drawing.new("Line")
-			tracerLine.Visible = true
-			tracerLine.From = Camera.ViewportSize / 2
-			local screenPos, onScreen = Camera:WorldToViewportPoint(enemyHRP.Position)
-			if onScreen then
-				tracerLine.To = Vector2.new(screenPos.X, screenPos.Y)
-				tracerLine.Color = Color3.fromRGB(255, 255, 0)
-				tracerLine.Thickness = 2
+	-- Only update highlights if the closest player changed
+	if closestPlayer ~= previousClosest then
+		for plr, hl in pairs(highlights) do
+			if not isValidTarget(plr) then
+				hl:Destroy()
+				highlights[plr] = nil
 			else
-				tracerLine.Visible = false
+				if plr == closestPlayer then
+					hl.OutlineColor = Color3.fromRGB(255, 255, 0) -- yellow for closest
+				else
+					hl.OutlineColor = Color3.fromRGB(255, 0, 0) -- red for others
+				end
 			end
 		end
+
+		updateTrackingLine(closestPlayer)
+
+		previousClosest = closestPlayer
+	end
+
+	if closestPlayer then
+		closestLabel.Text = "Closest: " .. closestPlayer.Name .. " [" .. math.floor(closestDist) .. "m]"
+		closestLabel.Visible = true
+	else
+		closestLabel.Visible = false
+		if trackingLine then
+			trackingLine:Destroy()
+			trackingLine = nil
+		end
+		previousClosest = nil
 	end
 end
 
---// Constant Updater
+-- Main Render Loop
 RunService.RenderStepped:Connect(function()
-	pcall(updateESP)
+	if _G.ESPEnabled then
+		pcall(updateESP)
+	end
 end)
 
---// Refresh when players join/respawn
-local function watchPlayer(player)
+-- Constant Refreshers
+local function trackPlayer(player)
 	player.CharacterAdded:Connect(function()
 		task.wait(1)
-		if _G.ESPEnabled then
-			if highlights[player] then highlights[player]:Destroy() end
-			highlights[player] = createHighlight(player)
-		end
+		if _G.ESPEnabled then refreshPlayerHighlight(player) end
 	end)
 
 	player.CharacterRemoving:Connect(function()
@@ -153,10 +229,20 @@ local function watchPlayer(player)
 			highlights[player] = nil
 		end
 	end)
+
+	if player.Character then
+		task.delay(1, function()
+			if _G.ESPEnabled then refreshPlayerHighlight(player) end
+		end)
+	end
 end
 
-for _, player in ipairs(Players:GetPlayers()) do
-	if player ~= LocalPlayer then watchPlayer(player) end
-end
+-- When player joins
+Players.PlayerAdded:Connect(trackPlayer)
 
-Players.PlayerAdded:Connect(watchPlayer)
+-- Existing players
+for _, player in pairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer then
+		trackPlayer(player)
+	end
+end
