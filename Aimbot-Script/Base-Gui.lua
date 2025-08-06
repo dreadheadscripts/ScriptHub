@@ -298,6 +298,8 @@ closeButton.MouseButton1Click:Connect(function()
 	openButton.Visible = true
 end)
 
+-- Load the external scripts AFTER _G.Tabs exists so they can add UI in the right tab
+
 -- Load the AimbotButton script into the Combat tab
 local loadSuccess, loadError = pcall(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
@@ -320,11 +322,10 @@ end
 
 -- Load the ESP script into the Player tab
 local espSuccess, espError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Esp.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Esp.lua"))()
 end)
-
 if not espSuccess then
-    warn("Failed to load Esp.lua:", espError)
+    warn("Failed to load ESP.lua:", espError)
 else
-    print("✅ Esp.lua loaded successfully into Player tab.")
+    print("✅ ESP.lua loaded and button should appear in Player tab.")
 end
