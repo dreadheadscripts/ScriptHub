@@ -1,127 +1,112 @@
---// Aimbot Button + Logic (GitHub-loaded)
-
+--// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
+
+--// Variables
 local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Mouse = LocalPlayer:GetMouse()
 
--- Make sure Combat tab exists
-local combatTab = _G.Tabs and _G.Tabs.Combat
-if not combatTab then return warn("Combat tab not found") end
-
--- Aimbot state
-_G.AimbotEnabled = false
+local CombatTab = _G.Tabs and _G.Tabs.Combat
+if not CombatTab then return end
 
 -- Settings
-local TARGET_PART = "Head"
-local FOV_RADIUS = 300
-local AUTO_CLICK_INTERVAL = 0.1
-local lastClick = 0
+local RANGE = 700
+local FOV = math.rad(90)
 
--- Create Aimbot Toggle Button
-local aimbotBtn = Instance.new("TextButton")
-aimbotBtn.Size = UDim2.new(0, 150, 0, 40)
-aimbotBtn.Position = UDim2.new(0, 10, 0, 10)
-aimbotBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-aimbotBtn.TextColor3 = Color3.new(1, 1, 1)
-aimbotBtn.Font = Enum.Font.GothamBold
-aimbotBtn.TextSize = 18
-aimbotBtn.Text = "Aimbot: Off"
-aimbotBtn.Parent = combatTab
+-- State
+local aimbotEnabled = true
+local killAuraEnabled = true
+local currentTarget = nil
 
-local corner = Instance.new("UICorner", aimbotBtn)
-corner.CornerRadius = UDim.new(0, 6)
+--// UI Button Creator
+local function createToggleButton(name, defaultOn, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 0, 40) -- full width
+	button.BackgroundColor3 = defaultOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 60)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 16
+	button.Text = name .. ": " .. (defaultOn and "On" or "Off")
+	button.Parent = CombatTab
 
--- Toggle handler
-aimbotBtn.MouseButton1Click:Connect(function()
-	_G.AimbotEnabled = not _G.AimbotEnabled
-	aimbotBtn.Text = _G.AimbotEnabled and "Aimbot: On" or "Aimbot: Off"
-	aimbotBtn.BackgroundColor3 = _G.AimbotEnabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(45, 45, 55)
-end)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = button
 
--- Helper: Check visibility and distance
-local function isValidTarget(player)
-	if player == LocalPlayer or not player.Character then return false end
+	local state = defaultOn
+	button.MouseButton1Click:Connect(function()
+		state = not state
+		button.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 60)
+		button.Text = name .. ": " .. (state and "On" or "Off")
+		callback(state)
+	end)
 
-	local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-	local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-	local targetPart = player.Character:FindFirstChild(TARGET_PART)
-
-	if not hrp or not humanoid or not targetPart then return false end
-	if humanoid.Health <= 0 then return false end
-
-	-- Invincibility or spawn protection check
-	if player:FindFirstChild("Spawned") or player:FindFirstChild("Invincible") then return false end
-
-	-- Wall check using raycast
-	local origin = Camera.CFrame.Position
-	local direction = (targetPart.Position - origin).Unit * 500
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-	local result = workspace:Raycast(origin, direction, raycastParams)
-
-	if result and result.Instance and not targetPart:IsDescendantOf(result.Instance.Parent) then
-		return false -- Hit a wall
-	end
-
-	return true
+	return button
 end
 
--- Helper: Find best target
+--// Get Closest Target
 local function getClosestTarget()
-	local closest, minDist = nil, FOV_RADIUS
-
-	for _, plr in pairs(Players:GetPlayers()) do
-		if isValidTarget(plr) then
-			local part = plr.Character and plr.Character:FindFirstChild(TARGET_PART)
-			if part then
-				local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-				if onScreen then
-					local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-					if dist < minDist then
-						closest = part
-						minDist = dist
+	local closest, minDist = nil, math.huge
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Team ~= LocalPlayer.Team then
+			local hrp = player.Character.HumanoidRootPart
+			local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+			local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
+			if onScreen and distance <= RANGE then
+				local dir = (hrp.Position - Camera.CFrame.Position).Unit
+				local dot = dir:Dot(Camera.CFrame.LookVector)
+				local angle = math.acos(dot)
+				if angle <= FOV then
+					if distance < minDist then
+						closest = player
+						minDist = distance
 					end
 				end
 			end
 		end
 	end
-
 	return closest
 end
 
--- Helper: Smooth aim
-local function aimAt(part)
-	local camCF = Camera.CFrame
-	local targetPos = part.Position
-	local direction = (targetPos - camCF.Position).Unit
-	local goal = CFrame.new(camCF.Position, camCF.Position + direction)
-
-	-- Smooth rotation
-	Camera.CFrame = camCF:Lerp(goal, 0.15)
-end
-
--- Simulate mobile click
-local function autoClick()
-	if tick() - lastClick < AUTO_CLICK_INTERVAL then return end
-	lastClick = tick()
-
-	local virtualInput = game:GetService("VirtualInputManager")
-	virtualInput:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, true, game, 0)
-	virtualInput:SendMouseButtonEvent(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2, 0, false, game, 0)
-end
-
--- Aimbot loop
+--// Aimbot Logic
 RunService.RenderStepped:Connect(function()
-	if not _G.AimbotEnabled then return end
+	if not aimbotEnabled then return end
+
+	currentTarget = getClosestTarget()
+	if currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart") then
+		local targetPos = currentTarget.Character.HumanoidRootPart.Position
+		local cameraPos = Camera.CFrame.Position
+		local dir = (targetPos - cameraPos).Unit
+		local newCFrame = CFrame.new(cameraPos, cameraPos + dir)
+		Camera.CFrame = newCFrame
+	end
+end)
+
+--// Kill Aura Logic
+RunService.Heartbeat:Connect(function()
+	if not killAuraEnabled then return end
 
 	local target = getClosestTarget()
-	if target then
-		aimAt(target)
-		autoClick()
+	if target and target.Character then
+		for _, part in ipairs(target.Character:GetDescendants()) do
+			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+				VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+				break
+			end
+		end
 	end
+end)
+
+--// UI Buttons
+createToggleButton("Aimbot", true, function(state)
+	aimbotEnabled = state
+end)
+
+createToggleButton("Kill Aura", true, function(state)
+	killAuraEnabled = state
 end)
