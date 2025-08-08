@@ -27,28 +27,26 @@ local function ClearESP()
 end
 
 -- Create ESP toggle button (like Aimbot button style)local toggleBtn = Instance.new("TextButton")local espOn = true
--- ESP toggle state
-local espOn = true
+-- ESP toggle state (default OFF)
+local espOn = false
 
 -- ESP Button
 local espButton = Instance.new("TextButton")
 espButton.Size = UDim2.new(1, 0, 0, 35)
 espButton.Position = UDim2.new(0, 0, 0, 10)
-espButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
+espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Gray for OFF
 espButton.TextColor3 = Color3.new(1, 1, 1)
 espButton.Font = Enum.Font.GothamBold
 espButton.TextSize = 18
-espButton.Text = "ESP: On"
+espButton.Text = "ESP: Off"
+espButton.Parent = _G.Tabs.Player
 
--- ✅ Set the correct parent
-espButton.Parent = playerTab
-
--- Add corner roundness
+-- Rounded corners
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = espButton
 
--- Toggle behavior
+-- Toggle logic
 espButton.MouseButton1Click:Connect(function()
     espOn = not espOn
     espButton.Text = "ESP: " .. (espOn and "On" or "Off")
