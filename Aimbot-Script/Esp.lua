@@ -1,112 +1,216 @@
---// Services
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
---// Settings
-local RANGE = 700
+-- Constants
+local Range = 700
 
---// ESP Storage
-local espDots = {}
-local trackingLine = Drawing.new("Line")
-trackingLine.Visible = false
-trackingLine.Thickness = 2
-trackingLine.Color = Color3.fromRGB(255, 255, 0)
-
---// Cleanup dead drawings
-local function clearESP()
-	for _, dot in pairs(espDots) do
-		dot:Remove()
-	end
-	espDots = {}
+-- Reference to Player tab (adjust this if needed)
+local playerTab = _G.Tabs and _G.Tabs.Player
+if not playerTab then
+    warn("Player tab not found!")
+    return
 end
 
---// Validate player
-local function isValidTarget(plr)
-	if plr == LocalPlayer then return false end
-	if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") then return false end
-	if not plr.Character:FindFirstChildOfClass("Humanoid") or plr.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then return false end
-	if plr.Team == LocalPlayer.Team then return false end
-	if (plr.Character.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude > RANGE then return false end
+-- Create ESP toggle button (same size & position as Aimbot button)
+local espButton = Instance.new("TextButton")
+espButton.Size = UDim2.new(0, 180, 0, 30)
+espButton.Position = UDim2.new(0, 10, 0, 65)
+espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.Font = Enum.Font.GothamBold
+espButton.TextSize = 14
+espButton.Text = "ESP: On"
+espButton.Name = "EspButton"
+espButton.Parent = playerTab
+Instance.new("UICorner", espButton)
 
-	-- Visibility check
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-	local rayResult = workspace:Raycast(Camera.CFrame.Position, (plr.Character.HumanoidRootPart.Position - Camera.CFrame.Position).Unit * 1000, rayParams)
+local espOn = true
+espButton.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espButton.Text = "ESP: " .. (espOn and "On" or "Off")
+    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+end)
 
-	if rayResult and not plr.Character:IsAncestorOf(rayResult.Instance) then
-		return false
-	end
+-- Table to hold outlines keyed by player
+local outlines = {}
 
-	return true
+local function createOutline()
+    local outline = {}
+    for _, lineName in ipairs({"Top", "Bottom", "Left", "Right"}) do
+        local line = Drawing.new("Line")
+        line.Color = Color3.new(1, 0, 0) -- default red
+        line.Thickness = 2
+        line.Visible = false
+        outline[lineName] = line
+    end
+    return outline
 end
 
---// Get closest visible enemy
-local function getClosestVisibleEnemy()
-	local closest
-	local minDist = math.huge
-
-	for _, player in ipairs(Players:GetPlayers()) do
-		if isValidTarget(player) then
-			local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-			if onScreen then
-				local dist = (Vector2.new(pos.X, pos.Y) - Camera.ViewportSize / 2).Magnitude
-				if dist < minDist then
-					minDist = dist
-					closest = player
-				end
-			end
-		end
-	end
-
-	return closest
+local function removeOutline(outline)
+    for _, line in pairs(outline) do
+        line:Remove()
+    end
 end
 
---// Main ESP Loop
+-- Add outlines for all players except local
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        outlines[player] = createOutline()
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        outlines[player] = createOutline()
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if outlines[player] then
+        removeOutline(outlines[player])
+        outlines[player] = nil
+    end
+end)
+
+-- Helper: get screen points for bounding box corners
+local function getBoundingBoxPoints(character)
+    local parts = {}
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            table.insert(parts, part)
+        end
+    end
+    if #parts == 0 then return nil end
+
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+
+    for _, part in pairs(parts) do
+        local corners = {
+            part.CFrame * Vector3.new(-part.Size.X/2, part.Size.Y/2, -part.Size.Z/2),
+            part.CFrame * Vector3.new(part.Size.X/2, part.Size.Y/2, -part.Size.Z/2),
+            part.CFrame * Vector3.new(-part.Size.X/2, -part.Size.Y/2, -part.Size.Z/2),
+            part.CFrame * Vector3.new(part.Size.X/2, -part.Size.Y/2, -part.Size.Z/2),
+            part.CFrame * Vector3.new(-part.Size.X/2, part.Size.Y/2, part.Size.Z/2),
+            part.CFrame * Vector3.new(part.Size.X/2, part.Size.Y/2, part.Size.Z/2),
+            part.CFrame * Vector3.new(-part.Size.X/2, -part.Size.Y/2, part.Size.Z/2),
+            part.CFrame * Vector3.new(part.Size.X/2, -part.Size.Y/2, part.Size.Z/2),
+        }
+
+        for _, corner in pairs(corners) do
+            local screenPos, onScreen = Camera:WorldToViewportPoint(corner)
+            if onScreen and screenPos.Z > 0 then
+                minX = math.min(minX, screenPos.X)
+                maxX = math.max(maxX, screenPos.X)
+                minY = math.min(minY, screenPos.Y)
+                maxY = math.max(maxY, screenPos.Y)
+            end
+        end
+    end
+
+    if minX == math.huge then return nil end
+
+    return {
+        minX = minX,
+        maxX = maxX,
+        minY = minY,
+        maxY = maxY
+    }
+end
+
+-- Main loop to update outlines
 RunService.RenderStepped:Connect(function()
-	clearESP()
-	local closestEnemy = getClosestVisibleEnemy()
-	local target = _G.AimbotTarget
+    if not espOn then
+        -- Hide all outlines if ESP off
+        for _, outline in pairs(outlines) do
+            for _, line in pairs(outline) do
+                line.Visible = false
+            end
+        end
+        return
+    end
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		if isValidTarget(player) then
-			local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-			if onScreen then
-				local dot = Drawing.new("Circle")
-				dot.Radius = 5
-				dot.Thickness = 2
-				dot.Filled = true
-				dot.Position = Vector2.new(pos.X, pos.Y)
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
 
-				-- Color logic
-				if player == target then
-					dot.Color = Color3.fromRGB(0, 255, 0) -- Green if tracked
-				elseif player == closestEnemy then
-					dot.Color = Color3.fromRGB(255, 255, 0) -- Yellow if closest
-				else
-					dot.Color = Color3.fromRGB(255, 0, 0) -- Red otherwise
-				end
+    local closestPlayer, closestDist = nil, math.huge
 
-				dot.Visible = true
-				table.insert(espDots, dot)
-			end
-		end
-	end
+    -- Find closest enemy player within range and different team
+    for player, outline in pairs(outlines) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local human = char and char:FindFirstChildOfClass("Humanoid")
 
-	-- Tracking line logic
-	if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-		local screenPos, onScreen = Camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
-		if onScreen then
-			trackingLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-			trackingLine.To = Vector2.new(screenPos.X, screenPos.Y)
-			trackingLine.Color = Color3.fromRGB(0, 255, 0)
-			trackingLine.Visible = true
-		else
-			trackingLine.Visible = false
-		end
-	else
-		trackingLine.Visible = false
-	end
+        if player ~= LocalPlayer and hrp and human and human.Health > 0 and player.Team ~= LocalPlayer.Team then
+            local dist = (hrp.Position - myHRP.Position).Magnitude
+            if dist <= Range and dist < closestDist then
+                closestPlayer = player
+                closestDist = dist
+            end
+        end
+    end
+
+    -- Update outlines
+    for player, outline in pairs(outlines) do
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local human = char and char:FindFirstChildOfClass("Humanoid")
+
+        if player ~= LocalPlayer and hrp and human and human.Health > 0 and player.Team ~= LocalPlayer.Team then
+            local dist = (hrp.Position - myHRP.Position).Magnitude
+            if dist <= Range then
+                local box = getBoundingBoxPoints(char)
+                if box then
+                    -- Draw box with 4 lines
+                    outline.Top.From = Vector2.new(box.minX, box.minY)
+                    outline.Top.To = Vector2.new(box.maxX, box.minY)
+
+                    outline.Bottom.From = Vector2.new(box.minX, box.maxY)
+                    outline.Bottom.To = Vector2.new(box.maxX, box.maxY)
+
+                    outline.Left.From = Vector2.new(box.minX, box.minY)
+                    outline.Left.To = Vector2.new(box.minX, box.maxY)
+
+                    outline.Right.From = Vector2.new(box.maxX, box.minY)
+                    outline.Right.To = Vector2.new(box.maxX, box.maxY)
+
+                    -- Color based on tracking and closest
+                    local isTracked = (_G.CurrentAimbotTarget == player)
+                    if isTracked then
+                        for _, line in pairs(outline) do
+                            line.Color = Color3.fromRGB(0, 255, 0) -- Green
+                        end
+                    elseif player == closestPlayer then
+                        for _, line in pairs(outline) do
+                            line.Color = Color3.fromRGB(255, 255, 0) -- Yellow
+                        end
+                    else
+                        for _, line in pairs(outline) do
+                            line.Color = Color3.fromRGB(255, 0, 0) -- Red
+                        end
+                    end
+
+                    for _, line in pairs(outline) do
+                        line.Visible = true
+                    end
+                else
+                    for _, line in pairs(outline) do
+                        line.Visible = false
+                    end
+                end
+            else
+                for _, line in pairs(outline) do
+                    line.Visible = false
+                end
+            end
+        else
+            for _, line in pairs(outline) do
+                line.Visible = false
+            end
+        end
+    end
 end)
