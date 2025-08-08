@@ -339,3 +339,14 @@ if not closestPlayerSuccess then
 else
     print("✅ ClosestPlayer.lua loaded and button should appear in Config tab.")
 end
+
+-- Load the TP Player script into the Player tab
+local tpPlayerSuccess, tpPlayerError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/tpplayer.lua"))()
+end)
+
+if not tpPlayerSuccess then
+    warn("Failed to load tpplayer.lua:", tpPlayerError)
+else
+    print("✅ TP Player loaded and button should appear in Player tab.")
+end
