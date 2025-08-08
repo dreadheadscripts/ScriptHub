@@ -129,6 +129,102 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+local previousClosestPlayer = nil
+
+RunService.RenderStepped:Connect(function()
+	if not espOn then
+		ClearESP()
+		return
+	end
+
+	local myChar = LocalPlayer.Character
+	local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return end
+
+	local closestPlayer = nil
+	local closestDist = math.huge
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if canBeDamaged(player) then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local dist = (hrp.Position - myHRP.Position).Magnitude
+				if dist <= MAX_DISTANCE then
+					if dist < closestDist then
+						closestDist = dist
+						closestPlayer = player
+					end
+
+					-- Create or update highlight
+					if not espHighlights[player] or not espHighlights[player].Parent then
+						if espHighlights[player] then
+							espHighlights[player]:Destroy()
+						end
+						local hl = Instance.new("Highlight")
+						hl.Adornee = char
+						hl.FillTransparency = 1
+						hl.OutlineTransparency = 0
+						hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						hl.Parent = playerTab
+						espHighlights[player] = hl
+					end
+				else
+					if espHighlights[player] then
+						espHighlights[player]:Destroy()
+						espHighlights[player] = nil
+					end
+				end
+			end
+		else
+			if espHighlights[player] then
+				espHighlights[player]:Destroy()
+				espHighlights[player] = nil
+			end
+		end
+	end
+
+	-- Handle closest player coloring
+	for player, hl in pairs(espHighlights) do
+		if hl and hl.Parent then
+			if _G.ClosestPlayerEnabled and player == closestPlayer then
+				hl.OutlineColor = Color3.new(1, 1, 0) -- Yellow
+			else
+				hl.OutlineColor = Color3.new(1, 0, 0) -- Red
+			end
+		end
+	end
+
+	-- Optional: yellow tracking line (if enabled)
+	if _G.ClosestPlayerEnabled then
+		if closestPlayer and closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = closestPlayer.Character.HumanoidRootPart
+			if not _G.ClosestLine then
+				local line = Drawing.new("Line")
+				line.Color = Color3.new(1, 1, 0)
+				line.Thickness = 2
+				line.Transparency = 1
+				line.ZIndex = 2
+				line.Visible = true
+				_G.ClosestLine = line
+			end
+
+			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+			local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+			_G.ClosestLine.From = center
+			_G.ClosestLine.To = Vector2.new(screenPos.X, screenPos.Y)
+			_G.ClosestLine.Visible = onScreen
+		end
+	else
+		-- Remove the yellow line if toggled off
+		if _G.ClosestLine then
+			_G.ClosestLine.Visible = false
+			_G.ClosestLine:Remove()
+			_G.ClosestLine = nil
+		end
+	end
+end)
+
 -- Cleanup on player removal
 Players.PlayerRemoving:Connect(function(p)
 	if espHighlights[p] then
