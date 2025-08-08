@@ -13,7 +13,7 @@ if not CombatTab then return warn("❌ Combat tab not found") end
 
 --// Config
 local RANGE = 700
-local FOV = 100
+local FOV = 300
 
 --// State
 local aimbotEnabled = false
