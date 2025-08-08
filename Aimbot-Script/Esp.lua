@@ -1,143 +1,115 @@
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
 
--- Constants
-local MAX_DISTANCE = 500
+local MAX_DISTANCE = 700
 
--- Position memory for GUI dragging (optional, you can remove if unused)
-getfenv()._G.ScriptManiacGUI_TextPositions = getfenv()._G.ScriptManiacGUI_TextPositions or {
-    mainFramePos = UDim2.new(0, 20, 0.3, 0)
-}
-
--- Toggles
-local espOn = false
-
--- Store ESP Highlights per player
-local espHighlights = {}
-
--- GUI Setup
-local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "ScriptManiacGUI"
-gui.ResetOnSpawn = false
-
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 200, 0, 70)
-frame.Position = _G.ScriptManiacGUI_TextPositions.mainFramePos
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-frame.Active = true
-frame.Draggable = true
-Instance.new("UICorner", frame)
-
-frame:GetPropertyChangedSignal("Position"):Connect(function()
-    _G.ScriptManiacGUI_TextPositions.mainFramePos = frame.Position
-    pcall(function()
-        writefile("ScriptManiac_Positions.json", HttpService:JSONEncode(_G.ScriptManiacGUI_TextPositions))
-    end)
-end)
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 20)
-title.Text = "Script Maniac ESP"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
-
-local function createButton(name, yPos, callback)
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0, 180, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Text = name .. ": Off"
-    Instance.new("UICorner", btn)
-
-    btn.MouseButton1Click:Connect(function()
-        callback()
-    end)
-
-    return btn
+-- Reference to Player tab where button will go
+local playerTab = _G.Tabs and _G.Tabs.Player
+if not playerTab then
+    warn("Player tab not found in _G.Tabs")
+    return
 end
 
--- ESP Toggle Button styled like Aimbot button
-local espButton = createButton("ESP", 25, function()
-    espOn = not espOn
-    if espOn then
-        espButton.Text = "ESP: On"
-        espButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-    else
-        espButton.Text = "ESP: Off"
-        espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-        -- Remove all highlights
-        for player, highlight in pairs(espHighlights) do
-            if highlight and highlight.Parent then
-                highlight:Destroy()
-            end
-        end
-        espHighlights = {}
-    end
-end)
+-- ESP state
+local espOn = false
+local espHighlights = {}
 
--- Function to check if player is a valid enemy for ESP
+-- Function to clear all ESP highlights
+local function ClearESP()
+    for player, hl in pairs(espHighlights) do
+        if hl and hl.Parent then
+            hl:Destroy()
+        end
+        espHighlights[player] = nil
+    end
+end
+
+-- Create ESP toggle button (like Aimbot button style)
+local espButton = Instance.new("TextButton")
+espButton.Size = UDim2.new(0, 180, 0, 30)
+espButton.Position = UDim2.new(0, 10, 0, 25) -- Adjust if needed inside Player tab
+espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.Font = Enum.Font.GothamBold
+espButton.TextSize = 14
+espButton.Text = "Esp: Off"
+espButton.Parent = playerTab
+
+local corner = Instance.new("UICorner", espButton)
+corner.CornerRadius = UDim.new(0, 6)
+
+-- Helper to check if player is enemy & alive
 local function canBeDamaged(player)
-    if player == LocalPlayer then return false end
-    local character = player.Character
-    if not character then return false end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not player or player == LocalPlayer then return false end
+    local char = player.Character
+    if not char then return false end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid or humanoid.Health <= 0 then return false end
-    local myTeam = LocalPlayer.Team
-    local theirTeam = player.Team
-    if myTeam and theirTeam and myTeam == theirTeam then return false end
+    -- Team check (if teams exist)
+    if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
+        return false
+    end
+    -- Spawn protection check
+    if char:FindFirstChildOfClass("ForceField") then
+        return false
+    end
     return true
 end
 
--- ESP Update Loop
+-- Function to update ESP highlights each frame
 RunService.RenderStepped:Connect(function()
-    if not espOn then return end
+    if not espOn then
+        ClearESP()
+        return
+    end
 
-    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
 
-    for _, player in pairs(Players:GetPlayers()) do
+    -- Find closest enemy to highlight (for outline color logic if you want)
+    local closestPlayer = nil
+    local closestDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
         if canBeDamaged(player) then
             local char = player.Character
-            if char then
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp and (hrp.Position - myHRP.Position).Magnitude <= MAX_DISTANCE then
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - myHRP.Position).Magnitude
+                if dist <= MAX_DISTANCE then
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPlayer = player
+                    end
+
+                    -- Create Highlight if doesn't exist
                     if not espHighlights[player] or not espHighlights[player].Parent then
-                        -- Create new highlight
+                        if espHighlights[player] then
+                            espHighlights[player]:Destroy()
+                        end
                         local hl = Instance.new("Highlight")
                         hl.Adornee = char
-                        hl.FillTransparency = 1
+                        hl.FillTransparency = 1 -- no fill
                         hl.OutlineTransparency = 0
-                        hl.OutlineColor = Color3.fromRGB(255, 0, 0) -- Red outline
+                        hl.OutlineColor = Color3.new(1, 0, 0) -- Red outline for all
                         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                        hl.Parent = gui
+                        hl.Parent = playerTab -- Parent inside Player tab GUI (or gui)
                         espHighlights[player] = hl
                     end
                 else
-                    -- Remove highlight if too far or no hrp
+                    -- If player is too far, remove highlight if exists
                     if espHighlights[player] then
                         espHighlights[player]:Destroy()
                         espHighlights[player] = nil
                     end
                 end
-            else
-                -- Remove highlight if no character
-                if espHighlights[player] then
-                    espHighlights[player]:Destroy()
-                    espHighlights[player] = nil
-                end
             end
         else
-            -- Remove highlight if can't be damaged (team or dead)
+            -- Not valid target, remove highlight
             if espHighlights[player] then
                 espHighlights[player]:Destroy()
                 espHighlights[player] = nil
@@ -146,7 +118,18 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Cleanup on player leaving
+-- Toggle ESP on/off on button click
+espButton.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espButton.Text = "Esp: " .. (espOn and "On" or "Off")
+    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
+
+    if not espOn then
+        ClearESP()
+    end
+end)
+
+-- Cleanup ESP on player respawn
 Players.PlayerRemoving:Connect(function(player)
     if espHighlights[player] then
         espHighlights[player]:Destroy()
@@ -154,12 +137,6 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- Cleanup on character removal (respawn)
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterRemoving:Connect(function()
-        if espHighlights[player] then
-            espHighlights[player]:Destroy()
-            espHighlights[player] = nil
-        end
-    end)
+LocalPlayer.CharacterAdded:Connect(function()
+    ClearESP()
 end)
