@@ -1,4 +1,7 @@
--- esp.lua
+-- Wait for _G.Tabs and Player tab frame
+repeat task.wait() until _G and _G.Tabs and _G.Tabs.Player
+local playerTabFrame = _G.Tabs.Player
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
@@ -6,26 +9,22 @@ local LocalPlayer = Players.LocalPlayer
 
 local MAX_DISTANCE = 700
 
--- Use shared global for text label positions
+-- Use saved positions or defaults (relative to Player tab frame)
 local positions = _G.ScriptManiacGUI_TextPositions or {
     trackingTextPos = UDim2.new(0.5, -125, 0, 10),
     closestTextPos = UDim2.new(0.5, -125, 0, 40),
 }
 
--- GUI Setup
-local gui = LocalPlayer:WaitForChild("PlayerGui")
-local espGui = Instance.new("ScreenGui", gui)
-espGui.Name = "ScriptManiacESP"
-espGui.ResetOnSpawn = false
-
--- Draggable Text labels for ESP info
+-- Helper to create draggable text labels inside Player tab frame
 local function createDraggableText(position, color, defaultText)
-    local frame = Instance.new("Frame", espGui)
+    local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 250, 0, 25)
     frame.Position = position
     frame.BackgroundTransparency = 1
     frame.Active = true
+    frame.Selectable = true
     frame.Draggable = true
+    frame.Parent = playerTabFrame
 
     local textLabel = Instance.new("TextLabel", frame)
     textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -37,13 +36,14 @@ local function createDraggableText(position, color, defaultText)
     textLabel.Text = defaultText or ""
     textLabel.Visible = true
 
-    -- Save new position on drag
+    -- Update global positions when dragged
     frame:GetPropertyChangedSignal("Position"):Connect(function()
-        positions[defaultText == "Tracking Target" and "trackingTextPos" or "closestTextPos"] = frame.Position
+        if defaultText == "Tracking Target" then
+            positions.trackingTextPos = frame.Position
+        elseif defaultText == "Closest Enemy" then
+            positions.closestTextPos = frame.Position
+        end
         _G.ScriptManiacGUI_TextPositions = positions
-        pcall(function()
-            writefile("ScriptManiac_Positions.json", game:GetService("HttpService"):JSONEncode(positions))
-        end)
     end)
 
     return textLabel
@@ -107,7 +107,7 @@ local function updateESP(currentTrackedTarget)
                         hl.FillTransparency = 1
                         hl.OutlineTransparency = 0
                         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                        hl.Parent = espGui
+                        hl.Parent = playerTabFrame -- put Highlight parent here or workspace if needed
                         espHighlights[player] = hl
                     end
 
@@ -139,6 +139,7 @@ local function updateESP(currentTrackedTarget)
         if hrp then
             local screenPos = Camera:WorldToViewportPoint(hrp.Position)
             if not lineToClosest then
+                local Drawing = require(game:GetService("ReplicatedStorage"):WaitForChild("Drawing") or {}) -- fallback; you should have Drawing lib loaded
                 lineToClosest = Drawing.new("Line")
                 lineToClosest.Thickness = 1.5
                 lineToClosest.Color = Color3.new(1, 1, 0)
@@ -158,8 +159,7 @@ local function updateESP(currentTrackedTarget)
     trackingText.Text = "Tracking Target: " .. (currentTrackedTarget and currentTrackedTarget.Name or "None")
 end
 
--- Main ESP loop
 RunService.RenderStepped:Connect(function()
-    local currentTrackedTarget = _G.CurrentAimbotTarget or nil -- read global shared from main script
+    local currentTrackedTarget = _G.CurrentAimbotTarget or nil
     updateESP(currentTrackedTarget)
 end)
