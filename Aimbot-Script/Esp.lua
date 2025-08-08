@@ -29,12 +29,12 @@ end
 
 -- Create ESP toggle button (like Aimbot button style)
 local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(0, 180, 0, 30)
-espButton.Position = UDim2.new(0, 10, 0, 25) -- Adjust if needed inside Player tab
-espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-espButton.TextColor3 = Color3.new(1, 1, 1)
-espButton.Font = Enum.Font.GothamBold
-espButton.TextSize = 14
+toggleBtn.Size = UDim2.new(1, 0, 0, 35) -- Full width like aimbot button
+toggleBtn.Position = UDim2.new(0, 0, 0, 10)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 18
 espButton.Text = "Esp: Off"
 espButton.Parent = playerTab
 
