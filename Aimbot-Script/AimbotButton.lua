@@ -4,63 +4,78 @@ local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
-
---// Config
-local AIMBOT_FOV = 300
-local AIMBOT_RANGE = 700
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 --// Tabs
 local CombatTab = _G.Tabs and _G.Tabs.Combat
+if not CombatTab then return warn("❌ Combat tab not found") end
 
---// GUI Toggle Button
-local aimbotButton = Instance.new("TextButton")
-aimbotButton.Size = UDim2.new(1, -20, 0, 35)
-aimbotButton.Position = UDim2.new(0, 10, 0, 10)
-aimbotButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-aimbotButton.TextColor3 = Color3.new(1, 1, 1)
-aimbotButton.Font = Enum.Font.GothamBold
-aimbotButton.TextSize = 16
-aimbotButton.Text = "Aimbot: Off"
-aimbotButton.Parent = CombatTab
+--// Config
+local RANGE = 700
+local FOV = 100
 
-local corner = Instance.new("UICorner", aimbotButton)
-corner.CornerRadius = UDim.new(0, 6)
-
---// Aimbot State
+--// State
 local aimbotEnabled = false
+local killAuraEnabled = false
 local currentTarget = nil
 local trackingLine = Drawing.new("Line")
-trackingLine.Thickness = 2
-trackingLine.Color = Color3.fromRGB(0, 255, 0)
 trackingLine.Visible = false
+trackingLine.Thickness = 2
 
---// Wall Check Function
-local function hasLineOfSight(targetPart)
-	local origin = Camera.CFrame.Position
-	local direction = (targetPart.Position - origin)
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	rayParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
-	local result = workspace:Raycast(origin, direction, rayParams)
-	return not result
+--// ESP Integration (for dot coloring)
+_G.AimbotTarget = nil
+
+--// Create Button
+local function createToggleButton(name, defaultOn, parent, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, 0, 0, 35)
+	button.BackgroundColor3 = defaultOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 40)
+	button.Text = name .. ": " .. (defaultOn and "On" or "Off")
+	button.TextColor3 = Color3.new(1,1,1)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 16
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner", button)
+	corner.CornerRadius = UDim.new(0, 6)
+
+	local toggled = defaultOn
+	button.MouseButton1Click:Connect(function()
+		toggled = not toggled
+		button.Text = name .. ": " .. (toggled and "On" or "Off")
+		button.BackgroundColor3 = toggled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 40)
+		callback(toggled)
+	end)
+
+	callback(defaultOn)
+
+	return button
 end
 
---// Get Closest Enemy
+--// Get Closest Valid Enemy
 local function getClosestEnemy()
 	local closest = nil
-	local shortestDistance = AIMBOT_RANGE
+	local shortestDist = math.huge
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			if player.Team == LocalPlayer.Team then continue end
+
 			local hrp = player.Character.HumanoidRootPart
-			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-			local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
+			local screenPoint, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+			if not onScreen then continue end
+			if (Camera.CFrame.Position - hrp.Position).Magnitude > RANGE then continue end
 
-			local sameTeam = player.Team == LocalPlayer.Team
-			local visible = hasLineOfSight(hrp)
+			local fovDist = (Vector2.new(screenPoint.X, screenPoint.Y) - Camera.ViewportSize / 2).Magnitude
+			if fovDist > FOV then continue end
 
-			if onScreen and distance < shortestDistance and not sameTeam and visible then
-				shortestDistance = distance
+			local ray = Ray.new(Camera.CFrame.Position, (hrp.Position - Camera.CFrame.Position).Unit * 1000)
+			local hitPart, hitPos = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character}, false, true)
+			if not hitPart or not player.Character:IsAncestorOf(hitPart) then continue end
+
+			if fovDist < shortestDist then
+				shortestDist = fovDist
 				closest = player
 			end
 		end
@@ -69,57 +84,60 @@ local function getClosestEnemy()
 	return closest
 end
 
---// Update ESP (assumes Esp.lua uses _G.ESP_DOTS)
-local function updateEspColors()
-	if not _G.ESP_DOTS then return end
-
-	for player, dot in pairs(_G.ESP_DOTS) do
-		if player == currentTarget then
-			dot.Color = Color3.fromRGB(0, 255, 0) -- green
-		else
-			dot.Color = Color3.fromRGB(255, 0, 0) -- red
-		end
-	end
-end
-
---// Aimbot Logic
+--// Aimbot + KillAura Loop
 RunService.RenderStepped:Connect(function()
-	if not aimbotEnabled then
-		trackingLine.Visible = false
+	if not aimbotEnabled and not killAuraEnabled then
 		currentTarget = nil
+		trackingLine.Visible = false
+		_G.AimbotTarget = nil
 		return
 	end
 
 	local target = getClosestEnemy()
-	currentTarget = target
-
 	if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+		currentTarget = target
 		local hrp = target.Character.HumanoidRootPart
-		local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+		-- Aimbot
+		if aimbotEnabled then
+			local direction = (hrp.Position - Camera.CFrame.Position).Unit
+			local newLookVector = CFrame.new(Camera.CFrame.Position, hrp.Position)
+			Camera.CFrame = Camera.CFrame:Lerp(newLookVector, 0.12)
+		end
+
+		-- Kill Aura
+		if killAuraEnabled then
+			local head = target.Character:FindFirstChild("Head")
+			if head then
+				pcall(function()
+					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+					VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+				end)
+			end
+		end
 
 		-- Tracking line
 		trackingLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 		trackingLine.To = Vector2.new(screenPos.X, screenPos.Y)
+		trackingLine.Color = Color3.fromRGB(0, 255, 0)
 		trackingLine.Visible = true
 
-		-- Smooth aim
-		local targetPos = CFrame.lookAt(Camera.CFrame.Position, hrp.Position)
-		Camera.CFrame = Camera.CFrame:Lerp(targetPos, 0.15)
+		-- ESP sync
+		_G.AimbotTarget = target
 
-		updateEspColors()
 	else
-		trackingLine.Visible = false
 		currentTarget = nil
+		trackingLine.Visible = false
+		_G.AimbotTarget = nil
 	end
 end)
 
---// Toggle Behavior
-aimbotButton.MouseButton1Click:Connect(function()
-	aimbotEnabled = not aimbotEnabled
-	aimbotButton.Text = "Aimbot: " .. (aimbotEnabled and "On" or "Off")
-	aimbotButton.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(60, 60, 60)
-	if not aimbotEnabled then
-		trackingLine.Visible = false
-		currentTarget = nil
-	end
+--// Create Buttons
+createToggleButton("Aimbot", false, CombatTab, function(state)
+	aimbotEnabled = state
+end)
+
+createToggleButton("Kill Aura", false, CombatTab, function(state)
+	killAuraEnabled = state
 end)
