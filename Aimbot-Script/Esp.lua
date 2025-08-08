@@ -14,7 +14,6 @@ if not playerTab then
 end
 
 -- ESP state
-local espOn = false
 local espHighlights = {}
 
 -- Function to clear all ESP highlights
@@ -28,20 +27,28 @@ local function ClearESP()
 end
 
 -- Create ESP toggle button (like Aimbot button style)local toggleBtn = Instance.new("TextButton")local espOn = true
+-- ESP toggle state
+local espOn = true
+
+-- ESP Button
 local espButton = Instance.new("TextButton")
 espButton.Size = UDim2.new(1, 0, 0, 35)
 espButton.Position = UDim2.new(0, 0, 0, 10)
-espButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green for ON
+espButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
 espButton.TextColor3 = Color3.new(1, 1, 1)
 espButton.Font = Enum.Font.GothamBold
 espButton.TextSize = 18
 espButton.Text = "ESP: On"
-espButton.Parent = _G.Tabs.Player -- ✅ Place it in the Player tab
 
+-- ✅ Set the correct parent
+espButton.Parent = playerTab
+
+-- Add corner roundness
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
 corner.Parent = espButton
 
+-- Toggle behavior
 espButton.MouseButton1Click:Connect(function()
     espOn = not espOn
     espButton.Text = "ESP: " .. (espOn and "On" or "Off")
@@ -51,23 +58,6 @@ espButton.MouseButton1Click:Connect(function()
         ClearESP()
     end
 end)
--- Helper to check if player is enemy & alive
-local function canBeDamaged(player)
-    if not player or player == LocalPlayer then return false end
-    local char = player.Character
-    if not char then return false end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return false end
-    -- Team check (if teams exist)
-    if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
-        return false
-    end
-    -- Spawn protection check
-    if char:FindFirstChildOfClass("ForceField") then
-        return false
-    end
-    return true
-end
 
 -- Function to update ESP highlights each frame
 RunService.RenderStepped:Connect(function()
