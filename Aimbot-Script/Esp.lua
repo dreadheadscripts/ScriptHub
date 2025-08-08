@@ -11,14 +11,12 @@ if not playerTab then return warn("Player tab not found in _G.Tabs") end
 
 local espOn = false
 local espHighlights = {}
-
--- Tracking line
 local closestLine = Drawing.new("Line")
 closestLine.Visible = false
 closestLine.Color = Color3.new(1, 1, 0) -- Yellow
 closestLine.Thickness = 1.5
 
--- Clear all ESP highlights
+-- Cleanup function
 local function ClearESP()
 	for player, hl in pairs(espHighlights) do
 		if hl and hl.Parent then
@@ -50,7 +48,7 @@ espButton.MouseButton1Click:Connect(function()
 	if not espOn then ClearESP() end
 end)
 
--- Utility: Check if player can be targeted
+-- Function to determine if a player is a valid enemy
 local function canBeDamaged(player)
 	if player == LocalPlayer then return false end
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
@@ -58,7 +56,81 @@ local function canBeDamaged(player)
 	return true
 end
 
--- Main Render Loop
+-- ESP Update Loop
+RunService.RenderStepped:Connect(function()
+	if not espOn then ClearESP() return end
+
+	local myChar = LocalPlayer.Character
+	local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return end
+
+	local closest, closestDist = nil, math.huge
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if canBeDamaged(player) then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local dist = (hrp.Position - myHRP.Position).Magnitude
+				if dist <= MAX_DISTANCE then
+					if dist < closestDist then
+						closest = player
+						closestDist = dist
+					end
+
+					if not espHighlights[player] or not espHighlights[player].Parent then
+						if espHighlights[player] then espHighlights[player]:Destroy() end
+						local hl = Instance.new("Highlight")
+						hl.Adornee = char
+						hl.FillTransparency = 1
+						hl.OutlineTransparency = 0
+						hl.OutlineColor = Color3.new(1, 0, 0) -- Default red
+						hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+						hl.Parent = playerTab
+						espHighlights[player] = hl
+					end
+				else
+					if espHighlights[player] then
+						espHighlights[player]:Destroy()
+						espHighlights[player] = nil
+					end
+				end
+			end
+		else
+			if espHighlights[player] then
+				espHighlights[player]:Destroy()
+				espHighlights[player] = nil
+			end
+		end
+	end
+
+	-- Apply yellow highlight and tracking line if closest player toggle is enabled
+	if _G.ClosestPlayerESP and closest and espHighlights[closest] then
+		for player, hl in pairs(espHighlights) do
+			if hl then
+				hl.OutlineColor = (player == closest) and Color3.new(1, 1, 0) or Color3.new(1, 0, 0)
+			end
+		end
+
+		local char = closest.Character
+		if char and char:FindFirstChild("HumanoidRootPart") then
+			local screenPos, onScreen = Camera:WorldToViewportPoint(char.HumanoidRootPart.Position)
+			if onScreen then
+				local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+				closestLine.From = center
+				closestLine.To = Vector2.new(screenPos.X, screenPos.Y)
+				closestLine.Visible = true
+			else
+				closestLine.Visible = false
+			end
+		end
+	else
+		closestLine.Visible = false
+	end
+end)
+
+local previousClosestPlayer = nil
+
 RunService.RenderStepped:Connect(function()
 	if not espOn then
 		ClearESP()
@@ -80,12 +152,15 @@ RunService.RenderStepped:Connect(function()
 				local dist = (hrp.Position - myHRP.Position).Magnitude
 				if dist <= MAX_DISTANCE then
 					if dist < closestDist then
-						closestPlayer = player
 						closestDist = dist
+						closestPlayer = player
 					end
 
+					-- Create or update highlight
 					if not espHighlights[player] or not espHighlights[player].Parent then
-						if espHighlights[player] then espHighlights[player]:Destroy() end
+						if espHighlights[player] then
+							espHighlights[player]:Destroy()
+						end
 						local hl = Instance.new("Highlight")
 						hl.Adornee = char
 						hl.FillTransparency = 1
@@ -109,7 +184,7 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- Color ESP highlights
+	-- Handle closest player coloring
 	for player, hl in pairs(espHighlights) do
 		if hl and hl.Parent then
 			if _G.ClosestPlayerEnabled and player == closestPlayer then
@@ -120,19 +195,37 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- Update tracking line
-	if _G.ClosestPlayerEnabled and closestPlayer and closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart") then
-		local screenPos, onScreen = Camera:WorldToViewportPoint(closestPlayer.Character.HumanoidRootPart.Position)
-		local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-		closestLine.From = center
-		closestLine.To = Vector2.new(screenPos.X, screenPos.Y)
-		closestLine.Visible = onScreen
+	-- Optional: yellow tracking line (if enabled)
+	if _G.ClosestPlayerEnabled then
+		if closestPlayer and closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local hrp = closestPlayer.Character.HumanoidRootPart
+			if not _G.ClosestLine then
+				local line = Drawing.new("Line")
+				line.Color = Color3.new(1, 1, 0)
+				line.Thickness = 2
+				line.Transparency = 1
+				line.ZIndex = 2
+				line.Visible = true
+				_G.ClosestLine = line
+			end
+
+			local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+			local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+			_G.ClosestLine.From = center
+			_G.ClosestLine.To = Vector2.new(screenPos.X, screenPos.Y)
+			_G.ClosestLine.Visible = onScreen
+		end
 	else
-		closestLine.Visible = false
+		-- Remove the yellow line if toggled off
+		if _G.ClosestLine then
+			_G.ClosestLine.Visible = false
+			_G.ClosestLine:Remove()
+			_G.ClosestLine = nil
+		end
 	end
 end)
 
--- Cleanup on player leave
+-- Cleanup on player removal
 Players.PlayerRemoving:Connect(function(p)
 	if espHighlights[p] then
 		espHighlights[p]:Destroy()
