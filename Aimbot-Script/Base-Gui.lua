@@ -1,331 +1,165 @@
---// Services
+-- Wait for _G.Tabs and Player tab frame
+repeat task.wait() until _G and _G.Tabs and _G.Tabs.Player
+local playerTabFrame = _G.Tabs.Player
+
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Loading screen code stored as a string variable
-local LoadingScreenCode = [[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Loading-Screen.lua"))()
-]]
+local MAX_DISTANCE = 700
 
--- Execute the loading screen
-local success, err = pcall(function()
-    loadstring(LoadingScreenCode)()
-end)
-
-if not success then
-    warn("Failed to load loading screen:", err)
-end
-
--- Wait for the loading screen GUI to appear
-local loadingGui = nil
-local timeout = 10
-local timer = 0
-while timer < timeout do
-    loadingGui = PlayerGui:FindFirstChild("LoadingScreen")
-    if loadingGui then
-        print("✅ Found LoadingScreen GUI")
-        break
-    end
-    task.wait(0.5)
-    timer = timer + 0.5
-end
-
-if not loadingGui then
-    warn("❌ LoadingScreen GUI never appeared, skipping wait.")
-end
-
--- Wait for loading screen to finish (destroyed)
-if loadingGui then
-    print("Waiting for LoadingScreen to finish...")
-    while loadingGui.Parent do
-        task.wait(0.5)
-    end
-    print("✅ LoadingScreen GUI destroyed, proceeding.")
-end
-
--- Now create the main Script Maniac Hub GUI
-
---// GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "ScriptManiacHub"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.IgnoreGuiInset = true
-gui.Parent = PlayerGui
-
---// Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 420, 0, 300)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Selectable = true
-mainFrame.Draggable = false
-mainFrame.Parent = gui
-
-local mainCorner = Instance.new("UICorner", mainFrame)
-mainCorner.CornerRadius = UDim.new(0, 10)
-
---// Main Frame Drag
-do
-	local dragging, dragInput, dragStart, startPos
-
-	mainFrame.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = mainFrame.Position
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
-		end
-	end)
-
-	mainFrame.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == dragInput then
-			local delta = input.Position - dragStart
-			mainFrame.Position = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
-		end
-	end)
-end
-
---// Title
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -40, 0, 40)
-title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Script Maniac Hub"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 22
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = mainFrame
-
---// Close Button
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -35, 0, 5)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.new(1, 1, 1)
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextSize = 14
-closeButton.Parent = mainFrame
-
-local closeCorner = Instance.new("UICorner", closeButton)
-closeCorner.CornerRadius = UDim.new(0, 6)
-
---// Open Button (Circular + Image) centered on screen
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(0, 60, 0, 60)
-openButton.Position = UDim2.new(0.5, 0, 0.5, 0) -- Center screen
-openButton.AnchorPoint = Vector2.new(0.5, 0.5)
-openButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-openButton.Text = ""
-openButton.Visible = false
-openButton.Parent = gui
-
-local openCorner = Instance.new("UICorner", openButton)
-openCorner.CornerRadius = UDim.new(1, 0) -- Circle shape
-
--- Image on open button
-local icon = Instance.new("ImageLabel")
-icon.Size = UDim2.new(1, -12, 1, -12)
-icon.Position = UDim2.new(0, 6, 0, 6)
-icon.BackgroundTransparency = 1
-icon.Image = "rbxassetid://107886940086071"
-icon.Parent = openButton
-
---// Open Button Drag + Click Fix (Mobile + PC)
-do
-	local dragging = false
-	local dragStart, dragInput, startPos
-	local wasDragging = false
-
-	openButton.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = openButton.Position
-			wasDragging = false
-
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-					task.delay(0.05, function()
-						wasDragging = false
-					end)
-				end
-			end)
-		end
-	end)
-
-	openButton.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == dragInput then
-			local delta = input.Position - dragStart
-			if math.abs(delta.X) > 2 or math.abs(delta.Y) > 2 then
-				wasDragging = true
-			end
-			openButton.Position = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + delta.X,
-				startPos.Y.Scale, startPos.Y.Offset + delta.Y
-			)
-		end
-	end)
-
-	openButton.MouseButton1Click:Connect(function()
-		if wasDragging then return end
-		mainFrame.Visible = true
-		openButton.Visible = false
-	end)
-end
-
---// Tab Buttons Frame
-local tabButtons = Instance.new("Frame")
-tabButtons.Size = UDim2.new(1, 0, 0, 35)
-tabButtons.Position = UDim2.new(0, 0, 0, 40)
-tabButtons.BackgroundTransparency = 1
-tabButtons.Parent = mainFrame
-
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-tabLayout.Padding = UDim.new(0, 5)
-tabLayout.Parent = tabButtons
-
---// Tab Content Area
-local tabContent = Instance.new("Frame")
-tabContent.Size = UDim2.new(1, -20, 1, -80)
-tabContent.Position = UDim2.new(0, 10, 0, 80)
-tabContent.BackgroundTransparency = 1
-tabContent.Parent = mainFrame
-
---// Tabs Setup
-local tabs = {
-	Combat = Instance.new("Frame"),
-	Player = Instance.new("Frame"),
-	Config = Instance.new("Frame")
+-- Use saved positions or defaults (relative to Player tab frame)
+local positions = _G.ScriptManiacGUI_TextPositions or {
+    trackingTextPos = UDim2.new(0.5, -125, 0, 10),
+    closestTextPos = UDim2.new(0.5, -125, 0, 40),
 }
 
-for name, frame in pairs(tabs) do
-	frame.Name = name .. "Tab"
-	frame.Size = UDim2.new(1, 0, 1, 0)
-	frame.BackgroundTransparency = 1
-	frame.Visible = false
-	frame.Parent = tabContent
+-- Helper to create draggable text labels inside Player tab frame
+local function createDraggableText(position, color, defaultText)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 250, 0, 25)
+    frame.Position = position
+    frame.BackgroundTransparency = 1
+    frame.Active = true
+    frame.Selectable = true
+    frame.Draggable = true
+    frame.Parent = playerTabFrame
 
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Text = name .. " Settings go here"
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.Font = Enum.Font.Gotham
-	label.TextSize = 18
-	label.TextWrapped = true
-	label.Parent = frame
+    local textLabel = Instance.new("TextLabel", frame)
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = color
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 16
+    textLabel.Text = defaultText or ""
+    textLabel.Visible = true
+
+    -- Update global positions when dragged
+    frame:GetPropertyChangedSignal("Position"):Connect(function()
+        if defaultText == "Tracking Target" then
+            positions.trackingTextPos = frame.Position
+        elseif defaultText == "Closest Enemy" then
+            positions.closestTextPos = frame.Position
+        end
+        _G.ScriptManiacGUI_TextPositions = positions
+    end)
+
+    return textLabel
 end
 
--- Expose tabs globally so external scripts can access them
-_G.Tabs = tabs
+local trackingText = createDraggableText(positions.trackingTextPos, Color3.new(0, 1, 0), "Tracking Target")
+local closestText = createDraggableText(positions.closestTextPos, Color3.new(1, 1, 0), "Closest Enemy")
 
---// Tab Switch Logic
-local function switchTo(tabName)
-	for name, frame in pairs(tabs) do
-		frame.Visible = (name == tabName)
-	end
+local espHighlights = {}
+local lineToClosest = nil
 
-	for _, button in ipairs(tabButtons:GetChildren()) do
-		if button:IsA("TextButton") then
-			button.BackgroundColor3 = (button.Name == tabName .. "Button")
-				and Color3.fromRGB(120, 120, 120)
-				or Color3.fromRGB(45, 45, 55)
-		end
-	end
+local function clearAllESP()
+    for _, hl in pairs(espHighlights) do
+        if hl and hl.Parent then
+            hl:Destroy()
+        end
+    end
+    espHighlights = {}
+    if lineToClosest then
+        lineToClosest.Visible = false
+        lineToClosest:Remove()
+        lineToClosest = nil
+    end
 end
 
---// Create Tab Buttons
-for name in pairs(tabs) do
-	local button = Instance.new("TextButton")
-	button.Name = name .. "Button"
-	button.Size = UDim2.new(0, 130, 1, 0)
-	button.Text = name
-	button.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.Font = Enum.Font.GothamBold
-	button.TextSize = 16
-	button.AutoButtonColor = true
-	button.Parent = tabButtons
-
-	local corner = Instance.new("UICorner", button)
-	corner.CornerRadius = UDim.new(0, 6)
-
-	button.MouseButton1Click:Connect(function()
-		switchTo(name)
-	end)
+local function isAlive(player)
+    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
 end
 
--- Show first tab by default
-switchTo("Combat")
+local function canBeDamaged(player)
+    if not player or player == LocalPlayer then return false end
+    local myTeam = LocalPlayer.Team
+    local theirTeam = player.Team
+    if not myTeam or not theirTeam then return true end
+    return myTeam ~= theirTeam
+end
 
--- Close button logic
-closeButton.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-	openButton.Visible = true
+local function updateESP(currentTrackedTarget)
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then
+        clearAllESP()
+        trackingText.Text = "Tracking Target: None"
+        closestText.Text = "Closest Enemy: None"
+        return
+    end
+
+    local closestEnemy, minDist = nil, math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and canBeDamaged(player) and isAlive(player) then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if dist <= MAX_DISTANCE then
+                    local hl = espHighlights[player]
+                    if not hl or not hl.Parent then
+                        if hl then hl:Destroy() end
+                        hl = Instance.new("Highlight")
+                        hl.Adornee = char
+                        hl.FillTransparency = 1
+                        hl.OutlineTransparency = 0
+                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        hl.Parent = playerTabFrame -- put Highlight parent here or workspace if needed
+                        espHighlights[player] = hl
+                    end
+
+                    if player == currentTrackedTarget then
+                        hl.OutlineColor = Color3.new(0, 1, 0) -- Green tracked
+                    else
+                        hl.OutlineColor = Color3.new(1, 0, 0) -- Red others
+                    end
+
+                    if dist < minDist then
+                        closestEnemy = player
+                        minDist = dist
+                    end
+                elseif espHighlights[player] then
+                    espHighlights[player]:Destroy()
+                    espHighlights[player] = nil
+                end
+            end
+        elseif espHighlights[player] then
+            espHighlights[player]:Destroy()
+            espHighlights[player] = nil
+        end
+    end
+
+    -- Closest enemy info and line
+    if closestEnemy then
+        closestText.Text = "Closest Enemy: " .. closestEnemy.Name .. " (" .. math.floor(minDist) .. " studs)"
+        local hrp = closestEnemy.Character and closestEnemy.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+            if not lineToClosest then
+                local Drawing = require(game:GetService("ReplicatedStorage"):WaitForChild("Drawing") or {}) -- fallback; you should have Drawing lib loaded
+                lineToClosest = Drawing.new("Line")
+                lineToClosest.Thickness = 1.5
+                lineToClosest.Color = Color3.new(1, 1, 0)
+                lineToClosest.Transparency = 1
+            end
+            lineToClosest.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            lineToClosest.To = Vector2.new(screenPos.X, screenPos.Y)
+            lineToClosest.Visible = screenPos.Z > 0
+        end
+    else
+        closestText.Text = "Closest Enemy: None"
+        if lineToClosest then
+            lineToClosest.Visible = false
+        end
+    end
+
+    trackingText.Text = "Tracking Target: " .. (currentTrackedTarget and currentTrackedTarget.Name or "None")
+end
+
+RunService.RenderStepped:Connect(function()
+    local currentTrackedTarget = _G.CurrentAimbotTarget or nil
+    updateESP(currentTrackedTarget)
 end)
-
--- Load the external scripts AFTER _G.Tabs exists so they can add UI in the right tab
-
--- Load the AimbotButton script into the Combat tab
-local loadSuccess, loadError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
-end)
-if not loadSuccess then
-    warn("Failed to load AimbotButton.lua:", loadError)
-else
-    print("✅ AimbotButton.lua loaded and added to Combat tab.")
-end
-
--- Load the Crosshair script
-local crosshairSuccess, crosshairError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Crosshair.lua"))()
-end)
-if not crosshairSuccess then
-    warn("Failed to load Crosshair.lua:", crosshairError)
-else
-    print("✅ Crosshair.lua loaded successfully.")
-end
-
--- Load the ESP script into the Player tab
-local espSuccess, espError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Esp.lua"))()
-end)
-if not espSuccess then
-    warn("Failed to load ESP.lua:", espError)
-else
-    print("✅ ESP.lua loaded and button should appear in Player tab.")
-end
