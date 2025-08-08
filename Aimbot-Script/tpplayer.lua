@@ -1,120 +1,98 @@
---// TP Player Module
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-
--- Make sure _G.Tabs.Player is valid
 local playerTab = _G.Tabs and _G.Tabs.Player
 if not playerTab then return warn("Player tab not found in _G.Tabs") end
 
--- Container frame for button + dropdown (below ESP at Y = 90)
-local container = Instance.new("Frame")
-container.Size = UDim2.new(1, -10, 0, 35)
-container.Position = UDim2.new(0, 5, 0, 90)
-container.BackgroundTransparency = 1
-container.Parent = playerTab
-
--- Selected player holder
 local selectedPlayer = nil
+
+-- Dropdown menu (right side)
+local dropdown = Instance.new("TextButton")
+dropdown.Size = UDim2.new(0.55, 0, 0, 35)
+dropdown.Position = UDim2.new(0.45, 0, 0, 55)
+dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+dropdown.TextColor3 = Color3.new(1, 1, 1)
+dropdown.Font = Enum.Font.Gotham
+dropdown.TextSize = 16
+dropdown.Text = "Select Player"
+dropdown.Parent = playerTab
+
+local corner1 = Instance.new("UICorner", dropdown)
+corner1.CornerRadius = UDim.new(0, 6)
+
+local playerListFrame = Instance.new("ScrollingFrame")
+playerListFrame.Size = UDim2.new(1, 0, 4, 0)
+playerListFrame.Position = UDim2.new(0, 0, 1, 0)
+playerListFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+playerListFrame.BorderSizePixel = 0
+playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerListFrame.Visible = false
+playerListFrame.ScrollBarThickness = 4
+playerListFrame.Parent = dropdown
+
+local function updateDropdown()
+	playerListFrame:ClearAllChildren()
+	local y = 0
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local option = Instance.new("TextButton")
+			option.Size = UDim2.new(1, 0, 0, 25)
+			option.Position = UDim2.new(0, 0, 0, y)
+			option.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			option.TextColor3 = Color3.new(1, 1, 1)
+			option.Font = Enum.Font.Gotham
+			option.TextSize = 14
+			option.Text = player.Name
+			option.Parent = playerListFrame
+
+			local uiCorner = Instance.new("UICorner", option)
+			uiCorner.CornerRadius = UDim.new(0, 4)
+
+			option.MouseButton1Click:Connect(function()
+				selectedPlayer = player
+				dropdown.Text = "Selected: " .. player.Name
+				playerListFrame.Visible = false
+			end)
+
+			y += 25
+		end
+	end
+	playerListFrame.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+dropdown.MouseButton1Click:Connect(function()
+	playerListFrame.Visible = not playerListFrame.Visible
+	updateDropdown()
+end)
+
+Players.PlayerAdded:Connect(updateDropdown)
+Players.PlayerRemoving:Connect(function(p)
+	if selectedPlayer == p then
+		selectedPlayer = nil
+		dropdown.Text = "Select Player"
+	end
+	updateDropdown()
+end)
 
 -- TP Button (left side)
 local tpButton = Instance.new("TextButton")
-tpButton.Size = UDim2.new(0.48, -2, 1, 0)
-tpButton.Position = UDim2.new(0, 0, 0, 0)
+tpButton.Size = UDim2.new(0.45, -5, 0, 35)
+tpButton.Position = UDim2.new(0, 0, 0, 55)
 tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 tpButton.TextColor3 = Color3.new(1, 1, 1)
 tpButton.Font = Enum.Font.GothamBold
-tpButton.TextSize = 16
-tpButton.Text = "TP Player"
-tpButton.Parent = container
+tpButton.TextSize = 18
+tpButton.Text = "TP To"
+tpButton.Parent = playerTab
 
-Instance.new("UICorner", tpButton).CornerRadius = UDim.new(0, 6)
+local corner2 = Instance.new("UICorner", tpButton)
+corner2.CornerRadius = UDim.new(0, 6)
 
--- Dropdown (right side)
-local dropdown = Instance.new("ScrollingFrame")
-dropdown.Size = UDim2.new(0.48, -2, 3, 0)
-dropdown.Position = UDim2.new(0.52, 2, 1.1, 0)
-dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-dropdown.BorderSizePixel = 0
-dropdown.CanvasSize = UDim2.new(0, 0, 0, 0)
-dropdown.ScrollBarThickness = 4
-dropdown.AutomaticCanvasSize = Enum.AutomaticSize.Y
-dropdown.Visible = false
-dropdown.Parent = container
-
-Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
-
-local UIListLayout = Instance.new("UIListLayout", dropdown)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
-
--- Teleport logic
-local function teleportToPlayer(p)
-	local myChar = LocalPlayer.Character
-	local hrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-	local targetChar = p and p.Character
-	local targetHRP = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-
-	if hrp and targetHRP then
-		hrp.CFrame = targetHRP.CFrame + Vector3.new(2, 0, 0)
-	end
-end
-
--- Dropdown player button creation
-local function createPlayerButton(p)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -10, 0, 30)
-	button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	button.TextColor3 = Color3.new(1, 1, 1)
-	button.Font = Enum.Font.Gotham
-	button.TextSize = 15
-	button.Text = p.DisplayName .. " (" .. p.Name .. ")"
-	button.Parent = dropdown
-
-	Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
-
-	button.MouseButton1Click:Connect(function()
-		selectedPlayer = p
-		dropdown.Visible = false
-		tpButton.Text = "TP: " .. p.DisplayName
-	end)
-end
-
--- Refresh dropdown list
-local function refreshDropdown()
-	dropdown:ClearAllChildren()
-	UIListLayout.Parent = dropdown
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			createPlayerButton(p)
-		end
-	end
-end
-
--- Button click
 tpButton.MouseButton1Click:Connect(function()
-	if selectedPlayer then
-		teleportToPlayer(selectedPlayer)
-	else
-		dropdown.Visible = not dropdown.Visible
-		if dropdown.Visible then
-			refreshDropdown()
+	if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		local myChar = LocalPlayer.Character
+		local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+		if myHRP then
+			myHRP.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
 		end
-	end
-end)
-
--- Auto-refresh on join/leave
-Players.PlayerAdded:Connect(function()
-	if dropdown.Visible then
-		refreshDropdown()
-	end
-end)
-
-Players.PlayerRemoving:Connect(function()
-	if dropdown.Visible then
-		refreshDropdown()
-	end
-	if selectedPlayer and not Players:FindFirstChild(selectedPlayer.Name) then
-		selectedPlayer = nil
-		tpButton.Text = "TP Player"
 	end
 end)
