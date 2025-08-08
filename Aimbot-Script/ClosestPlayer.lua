@@ -27,3 +27,49 @@ button.MouseButton1Click:Connect(function()
 	button.Text = "Closest Player: " .. (on and "On" or "Off")
 	button.BackgroundColor3 = on and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 end)
+
+local previousClosest = nil -- store previous closest player
+
+local function resetHighlight(player)
+    local hl = espHighlights[player]
+    if hl and hl.Parent then
+        hl.OutlineColor = Color3.new(1, 0, 0) -- reset to red
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    ClosestPlayerEnabled = not ClosestPlayerEnabled
+    toggleBtn.Text = ClosestPlayerEnabled and "Closest Player: On" or "Closest Player: Off"
+    toggleBtn.BackgroundColor3 = ClosestPlayerEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 40)
+
+    if not ClosestPlayerEnabled and previousClosest then
+        resetHighlight(previousClosest)
+        previousClosest = nil
+        -- Also remove the line tracking if any
+        if trackingLine then
+            trackingLine.Visible = false
+            trackingLine = nil
+        end
+    end
+end)
+
+-- In your RenderStepped update, after finding closest player:
+if ClosestPlayerEnabled then
+    if previousClosest and previousClosest ~= closestPlayer then
+        resetHighlight(previousClosest)
+    end
+
+    previousClosest = closestPlayer
+    -- set yellow outline
+    if closestPlayer and espHighlights[closestPlayer] then
+        espHighlights[closestPlayer].OutlineColor = Color3.fromRGB(255, 255, 0) -- yellow
+    end
+
+    -- update tracking line code here...
+else
+    -- When off, no line and no yellow highlight
+    if previousClosest then
+        resetHighlight(previousClosest)
+        previousClosest = nil
+    end
+end
