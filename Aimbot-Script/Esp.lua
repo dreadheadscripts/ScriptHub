@@ -27,20 +27,32 @@ local function ClearESP()
     end
 end
 
--- Create ESP toggle button (like Aimbot button style)
+-- Create ESP toggle button (like Aimbot button style)local toggleBtn = Instance.new("TextButton")local espOn = true
 local espButton = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, 0, 0, 35) -- Full width like aimbot button
-toggleBtn.Position = UDim2.new(0, 0, 0, 10)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
-toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 18
-espButton.Text = "Esp: Off"
-espButton.Parent = playerTab
+espButton.Size = UDim2.new(1, 0, 0, 35) -- Full width
+espButton.Position = UDim2.new(0, 0, 0, 10)
+espButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
+espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.Font = Enum.Font.GothamBold
+espButton.TextSize = 18
+espButton.Text = "ESP: On"
+espButton.Parent = configTab
 
-local corner = Instance.new("UICorner", espButton)
+-- Rounded corners
+local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = espButton
 
+-- Toggle handler
+espButton.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espButton.Text = "ESP: " .. (espOn and "On" or "Off")
+    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(80, 80, 80)
+
+    if not espOn then
+        ClearESP()
+    end
+end)
 -- Helper to check if player is enemy & alive
 local function canBeDamaged(player)
     if not player or player == LocalPlayer then return false end
@@ -115,17 +127,6 @@ RunService.RenderStepped:Connect(function()
                 espHighlights[player] = nil
             end
         end
-    end
-end)
-
--- Toggle ESP on/off on button click
-espButton.MouseButton1Click:Connect(function()
-    espOn = not espOn
-    espButton.Text = "Esp: " .. (espOn and "On" or "Off")
-    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(80, 80, 80)
-
-    if not espOn then
-        ClearESP()
     end
 end)
 
