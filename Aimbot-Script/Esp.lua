@@ -34,7 +34,7 @@ local espOn = false
 local espButton = Instance.new("TextButton")
 espButton.Size = UDim2.new(1, 0, 0, 35)
 espButton.Position = UDim2.new(0, 0, 0, 10)
-espButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Gray for OFF
+espButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Gray for OFF
 espButton.TextColor3 = Color3.new(1, 1, 1)
 espButton.Font = Enum.Font.GothamBold
 espButton.TextSize = 18
@@ -50,7 +50,7 @@ corner.Parent = espButton
 espButton.MouseButton1Click:Connect(function()
     espOn = not espOn
     espButton.Text = "ESP: " .. (espOn and "On" or "Off")
-    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(80, 80, 80)
+    espButton.BackgroundColor3 = espOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 
     if not espOn then
         ClearESP()
