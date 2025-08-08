@@ -329,3 +329,13 @@ if not espSuccess then
 else
     print("✅ ESP.lua loaded and button should appear in Player tab.")
 end
+
+-- Load the Closest Player script into the Config tab
+local closestPlayerSuccess, closestPlayerError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/ClosestPlayer.lua"))()
+end)
+if not closestPlayerSuccess then
+    warn("Failed to load ClosestPlayer.lua:", closestPlayerError)
+else
+    print("✅ ClosestPlayer.lua loaded and button should appear in Config tab.")
+end
