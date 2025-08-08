@@ -1,130 +1,91 @@
---// Services
+--// TP Player Module
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+
 local playerTab = _G.Tabs and _G.Tabs.Player
 if not playerTab then return warn("Player tab not found in _G.Tabs") end
 
---// Button + Dropdown Container
-local container = Instance.new("Frame")
-container.Size = UDim2.new(1, 0, 0, 90)
-container.Position = UDim2.new(0, 0, 0, 50)
-container.BackgroundTransparency = 1
-container.Parent = playerTab
-
---// TP Player Button (aligned to the left)
+-- Main Button
 local tpButton = Instance.new("TextButton")
-tpButton.Size = UDim2.new(0.45, 0, 0, 35)
-tpButton.Position = UDim2.new(0, 0, 0, 0)
+tpButton.Size = UDim2.new(1, -10, 0, 35)
+tpButton.Position = UDim2.new(0, 5, 0, 50) -- Slightly to the left, below ESP button
 tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 tpButton.TextColor3 = Color3.new(1, 1, 1)
 tpButton.Font = Enum.Font.GothamBold
-tpButton.TextSize = 16
-tpButton.Text = "TP Closest"
-tpButton.Parent = container
+tpButton.TextSize = 18
+tpButton.Text = "TP Player ▼"
+tpButton.Parent = playerTab
 
-local corner = Instance.new("UICorner", tpButton)
-corner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", tpButton).CornerRadius = UDim.new(0, 6)
 
---// Dropdown Button
-local dropdownButton = Instance.new("TextButton")
-dropdownButton.Size = UDim2.new(0.5, 0, 0, 35)
-dropdownButton.Position = UDim2.new(0.5, 0, 0, 0)
-dropdownButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-dropdownButton.TextColor3 = Color3.new(1, 1, 1)
-dropdownButton.Font = Enum.Font.GothamBold
-dropdownButton.TextSize = 16
-dropdownButton.Text = "TP To Player ▼"
-dropdownButton.Parent = container
+-- Dropdown Frame
+local dropdown = Instance.new("ScrollingFrame")
+dropdown.Size = UDim2.new(1, -10, 0, 120)
+dropdown.Position = UDim2.new(0, 5, 0, 90)
+dropdown.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+dropdown.BorderSizePixel = 0
+dropdown.CanvasSize = UDim2.new(0, 0, 0, 0)
+dropdown.ScrollBarThickness = 4
+dropdown.Visible = false
+dropdown.AutomaticCanvasSize = Enum.AutomaticSize.Y
+dropdown.Parent = playerTab
 
-local dropdownCorner = Instance.new("UICorner", dropdownButton)
-dropdownCorner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
 
---// Dropdown Frame
-local dropdownFrame = Instance.new("ScrollingFrame")
-dropdownFrame.Size = UDim2.new(1, 0, 0, 50)
-dropdownFrame.Position = UDim2.new(0, 0, 0, 40)
-dropdownFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-dropdownFrame.Visible = false
-dropdownFrame.ScrollBarThickness = 4
-dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-dropdownFrame.Parent = container
+local UIListLayout = Instance.new("UIListLayout", dropdown)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
 
-local dropdownUICorner = Instance.new("UICorner", dropdownFrame)
-dropdownUICorner.CornerRadius = UDim.new(0, 6)
+-- Teleport function
+local function teleportToPlayer(target)
+	local myChar = LocalPlayer.Character
+	local hrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+	local targetChar = target and target.Character
+	local targetHRP = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
 
-local UIListLayout = Instance.new("UIListLayout", dropdownFrame)
-UIListLayout.Padding = UDim.new(0, 2)
-
---// Teleport to Closest Player
-local function canBeDamaged(player)
-	if player == LocalPlayer then return false end
-	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
-	if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then return false end
-	return true
+	if hrp and targetHRP then
+		hrp.CFrame = targetHRP.CFrame + Vector3.new(2, 0, 0) -- Offset to avoid overlap
+	end
 end
 
-tpButton.MouseButton1Click:Connect(function()
-	local myChar = LocalPlayer.Character
-	local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-	if not myHRP then return end
+-- Create a dropdown button for a player
+local function createPlayerButton(p)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -10, 0, 30)
+	button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 16
+	button.Text = p.DisplayName .. " (" .. p.Name .. ")"
+	button.Parent = dropdown
 
-	local closestPlayer, closestDist = nil, math.huge
-	for _, player in ipairs(Players:GetPlayers()) do
-		if canBeDamaged(player) then
-			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-			local dist = (hrp.Position - myHRP.Position).Magnitude
-			if dist < closestDist then
-				closestDist = dist
-				closestPlayer = player
-			end
+	Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
+
+	button.MouseButton1Click:Connect(function()
+		teleportToPlayer(p)
+		dropdown.Visible = false
+		tpButton.Text = "TP Player ▼"
+	end)
+end
+
+-- Refresh dropdown list
+local function refreshDropdown()
+	dropdown:ClearAllChildren()
+	UIListLayout.Parent = dropdown -- reattach
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			createPlayerButton(p)
 		end
 	end
-
-	if closestPlayer then
-		myHRP.CFrame = closestPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-	end
-end)
-
---// Create dropdown items
-local function updateDropdown()
-	dropdownFrame:ClearAllChildren()
-	UIListLayout.Parent = dropdownFrame
-	local count = 0
-
-	for _, player in ipairs(Players:GetPlayers()) do
-		local button = Instance.new("TextButton")
-		button.Size = UDim2.new(1, -4, 0, 25)
-		button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Font = Enum.Font.Gotham
-		button.TextSize = 14
-		button.Text = player.Name
-		button.Parent = dropdownFrame
-
-		local btnCorner = Instance.new("UICorner", button)
-		btnCorner.CornerRadius = UDim.new(0, 4)
-
-		button.MouseButton1Click:Connect(function()
-			if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-				local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-				if myHRP then
-					myHRP.CFrame = player.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-				end
-			end
-			dropdownFrame.Visible = false
-		end)
-
-		count += 1
-	end
-
-	dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, count * 27)
 end
 
-dropdownButton.MouseButton1Click:Connect(function()
-	updateDropdown()
-	dropdownFrame.Visible = not dropdownFrame.Visible
+-- Toggle dropdown on button click
+tpButton.MouseButton1Click:Connect(function()
+	dropdown.Visible = not dropdown.Visible
+	tpButton.Text = dropdown.Visible and "TP Player ▲" or "TP Player ▼"
+	refreshDropdown()
 end)
 
---// Auto-update dropdown on player join/leave
-Players.PlayerAdded:Connect(updateDropdown)
-Players.PlayerRemoving:Connect(updateDropdown)
+-- Update list on player changes
+Players.PlayerAdded:Connect(refreshDropdown)
+Players.PlayerRemoving:Connect(refreshDropdown)
