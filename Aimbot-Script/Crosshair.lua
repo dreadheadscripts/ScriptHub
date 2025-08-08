@@ -30,11 +30,11 @@ for _, line in pairs(crosshair) do
 	line.Visible = crosshairOn
 end
 
---// Create Toggle Button in Config Tab
+--// Create Toggle Button in Config Tab (Full Width)
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 160, 0, 40)
-toggleBtn.Position = UDim2.new(0, 10, 0, 10)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- ✅ Green when ON
+toggleBtn.Size = UDim2.new(1, 0, 0, 35) -- Full width like aimbot button
+toggleBtn.Position = UDim2.new(0, 0, 0, 10)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green when ON
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 18
@@ -71,7 +71,6 @@ RunService.RenderStepped:Connect(function()
 	crosshair.right.From = Vector2.new(cx + crosshairGap, cy)
 	crosshair.right.To = Vector2.new(cx + crosshairGap + crosshairSize, cy)
 
-	-- Refresh visibility
 	for _, line in pairs(crosshair) do
 		line.Visible = crosshairOn
 	end
