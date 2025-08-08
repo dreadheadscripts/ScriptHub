@@ -48,6 +48,29 @@ espButton.MouseButton1Click:Connect(function()
 	if not espOn then ClearESP() end
 end)
 
+-- Detect FFA
+local function isFFA()
+    local myTeam = LocalPlayer.Team
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= myTeam then
+            return false -- Found someone on a different team, so it's not FFA
+        end
+    end
+    return true -- Everyone's on the same team (FFA or no teams)
+end
+
+-- Check if enemy
+local function isEnemy(player)
+    if player == LocalPlayer then return false end
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+
+    if isFFA() then
+        return true -- FFA mode: everyone except you is an enemy
+    else
+        return player.Team ~= LocalPlayer.Team
+    end
+end
+
 -- Function to determine if a player is a valid enemy
 local function canBeDamaged(player)
 	if player == LocalPlayer then return false end
