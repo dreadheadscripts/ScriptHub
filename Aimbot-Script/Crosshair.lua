@@ -48,7 +48,7 @@ corner.CornerRadius = UDim.new(0, 6)
 toggleBtn.MouseButton1Click:Connect(function()
 	crosshairOn = not crosshairOn
 	toggleBtn.Text = crosshairOn and "Crosshair: On" or "Crosshair: Off"
-	toggleBtn.BackgroundColor3 = crosshairOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(50, 50, 60)
+	toggleBtn.BackgroundColor3 = crosshairOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 
 	for _, line in pairs(crosshair) do
 		line.Visible = crosshairOn
