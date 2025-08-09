@@ -98,6 +98,14 @@ local function refreshHighlight(player)
 	end
 end
 
+-- Refresh all highlights for all players (to keep ESP synced)
+local function RefreshAllESP()
+	if not espOn then return end
+	for _, player in ipairs(Players:GetPlayers()) do
+		refreshHighlight(player)
+	end
+end
+
 -- Attach to humanoid and detect friendly fire
 local function attachHumanoid(player, humanoid)
 	if not humanoid or not player then return end
@@ -197,6 +205,7 @@ local function bindPlayer(player)
 			attachHumanoid(player, humanoid)
 		end
 		refreshHighlight(player)
+		RefreshAllESP() -- Refresh all highlights when any player respawns
 
 		-- Clear highlight when character is removed (dies or despawns)
 		char.AncestryChanged:Connect(function(_, parent)
@@ -224,13 +233,19 @@ end
 for _,p in ipairs(Players:GetPlayers()) do
 	bindPlayer(p)
 end
-Players.PlayerAdded:Connect(bindPlayer)
+
+Players.PlayerAdded:Connect(function(p)
+	bindPlayer(p)
+	RefreshAllESP() -- Refresh all highlights on player join
+end)
+
 Players.PlayerRemoving:Connect(function(p)
 	if humanoidConns[p] then pcall(function() humanoidConns[p]:Disconnect() end) end
 	humanoidConns[p] = nil
 	humanoidPrevHealth[p] = nil
 	destroyHighlightFor(p)
 	if previousClosest == p then previousClosest = nil end
+	RefreshAllESP() -- Refresh all highlights on player leave
 end)
 
 -- ESP button
