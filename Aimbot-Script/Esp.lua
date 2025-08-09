@@ -247,28 +247,10 @@ Instance.new("UICorner", espButton).CornerRadius = UDim.new(0,6)
 
 espButton.MouseButton1Click:Connect(function()
 	espOn = not espOn
+	_G.ForceFFA = espOn  -- Enable force FFA while ESP is on, disable otherwise
 	espButton.Text = "ESP: " .. (espOn and "On" or "Off")
 	espButton.BackgroundColor3 = espOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
 	if not espOn then ClearESP() end
-end)
-
--- Force FFA toggle
-local ffaBtn = Instance.new("TextButton")
-ffaBtn.Size = UDim2.new(0.48, -4, 0, 30)
-ffaBtn.Position = UDim2.new(0, 0, 0, 50)
-ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
-ffaBtn.Font = Enum.Font.GothamBold
-ffaBtn.TextSize = 16
-ffaBtn.TextColor3 = Color3.new(1,1,1)
-ffaBtn.Parent = playerTab
-Instance.new("UICorner", ffaBtn).CornerRadius = UDim.new(0,6)
-
-ffaBtn.MouseButton1Click:Connect(function()
-	_G.ForceFFA = not _G.ForceFFA
-	ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
-	ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-	if espOn then ClearESP() end
 end)
 
 -- Heuristic label
