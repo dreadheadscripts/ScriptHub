@@ -1,4 +1,4 @@
--- Esp.lua (improved FFA detection via friendly-fire heuristics)
+-- Esp.lua (with Force FFA toggle & improved handling)
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,7 +23,7 @@ local previousClosest = nil
 _G.ForceFFA = (_G.ForceFFA == nil) and false or _G.ForceFFA
 _G.ClosestPlayerESP = (_G.ClosestPlayerESP == nil) and false or _G.ClosestPlayerESP
 
--- drawing line (if supported)
+-- Drawing line (if executor supports Drawing)
 local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
 if not _G.ClosestLine and hasDrawing and DrawingNew then
 	local ok, line = pcall(DrawingNew, "Line")
@@ -36,16 +36,7 @@ if not _G.ClosestLine and hasDrawing and DrawingNew then
 	end
 end
 
--- Friendly-fire detection state
-local friendlyFireDetected = false
-local friendlyFireTimeout = 20 -- seconds to treat as FFA after detection (tweakable)
-local friendlyFireExpiry = 0
-
--- store humanoid watchers to disconnect later
-local humanoidConns = {}        -- [player] = RBXScriptConnection
-local humanoidPrevHealth = {}   -- [player] = number
-
--- helpers to manage highlights
+-- helpers
 local function destroyHighlightFor(player)
 	local hl = espHighlights[player]
 	if hl then
@@ -67,137 +58,65 @@ local function isAlive(player)
 	return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChild("Humanoid").Health > 0
 end
 
--- NEW: Attach to a player's Humanoid and listen for health drops to detect friendly fire
-local function attachHumanoid(player, humanoid)
-	if not humanoid or not player then return end
-	humanoidPrevHealth[player] = humanoid.Health
+-- Improved FFA detection:
+-- 1) If _G.ForceFFA == true -> FFA
+-- 2) If no team values assigned at all (everyone.Team == nil) -> FFA
+-- 3) If everyone (except you) is on the same team as you -> FFA
+-- NOTE: This is a heuristic; some games use server-only friendly-fire toggles that can't be read client-side.
+local function isFFA()
+	if _G.ForceFFA then return true end
 
-	-- disconnect any previous connection for safety
-	if humanoidConns[player] then
-		pcall(function() humanoidConns[player]:Disconnect() end)
-		humanoidConns[player] = nil
+	-- check if any player has a non-nil team assigned
+	local anyTeamAssigned = false
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p.Team ~= nil then
+			anyTeamAssigned = true
+			break
+		end
+	end
+	if not anyTeamAssigned then
+		-- no teams in use -> treat as FFA
+		return true
 	end
 
-	humanoidConns[player] = humanoid.HealthChanged:Connect(function(newHealth)
-		local prev = humanoidPrevHealth[player] or newHealth
-		-- only react to damage (health drop)
-		if newHealth < prev then
-			-- attempt to determine attacker via common server tagging patterns
-			local victim = player
-			local attacker = nil
-
-			-- 1) scan for ObjectValue-like creator tags in Humanoid children
-			for _,child in ipairs(humanoid:GetChildren()) do
-				if child:IsA("ObjectValue") and child.Value then
-					local name = child.Name:lower()
-					if name:find("creator") or name:find("killer") or name:find("attacker") or name:find("last") or name:find("damager") then
-						local val = child.Value
-						-- if value is a Model (character), map to player
-						local pl = Players:GetPlayerFromCharacter(val) or (val:IsA("Player") and val) or Players:FindFirstChild(val.Name)
-						if pl then
-							attacker = pl
-							break
-						end
-					end
-				end
-			end
-
-			-- 2) check common singular creator names
-			if not attacker then
-				local creator = humanoid:FindFirstChild("creator") or humanoid:FindFirstChild("Creator") or humanoid:FindFirstChild("creatorPlayer")
-				if creator and creator.Value then
-					local pl = Players:GetPlayerFromCharacter(creator.Value) or (creator.Value:IsA("Player") and creator.Value) or Players:FindFirstChild(creator.Value.Name)
-					if pl then attacker = pl end
-				end
-			end
-
-			-- 3) attributes fallback (some games set attributes)
-			if not attacker then
-				local attr = humanoid:GetAttribute("lastAttacker") or humanoid:GetAttribute("LastAttacker")
-				if attr and typeof(attr) == "Instance" then
-					local pl = Players:GetPlayerFromCharacter(attr) or Players:FindFirstChild(attr.Name)
-					if pl then attacker = pl end
-				end
-			end
-
-			-- 4) proximity + tool heuristic if no attacker found (teammate right next to victim w/ a Tool): assume possible friendly fire
-			if not attacker then
-				local victimHRP = victim.Character and victim.Character:FindFirstChild("HumanoidRootPart")
-				if victimHRP then
-					for _,other in ipairs(Players:GetPlayers()) do
-						if other ~= victim and other.Team and victim.Team and other.Team == victim.Team and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
-							local otherHRP = other.Character.HumanoidRootPart
-							if (otherHRP.Position - victimHRP.Position).Magnitude <= 12 then
-								-- check if other has a Tool in hand / character
-								for _,c in ipairs(other.Character:GetChildren()) do
-									if c:IsA("Tool") then
-										attacker = other
-										break
-									end
-								end
-								if attacker then break end
-							end
-						end
-					end
-				end
-			end
-
-			-- If we identified an attacker and they're on the same team as victim -> mark friendly fire
-			if attacker and victim.Team and attacker.Team and attacker.Team == victim.Team and attacker ~= victim then
-				friendlyFireDetected = true
-				friendlyFireExpiry = tick() + friendlyFireTimeout
-				-- helpful debug log for you
-				pcall(function()
-					print(("ESP: friendly-fire detected — %s hit %s; FFA for %ds"):format(attacker.Name, victim.Name, friendlyFireTimeout))
-				end)
-			else
-				-- else, if no attacker found, we leave it (we already ran a proximity heuristic above)
+	-- if everyone else is on same team as local player => FFA
+	local myTeam = LocalPlayer.Team
+	local totalOthers = 0
+	local sameTeamCount = 0
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer then
+			totalOthers = totalOthers + 1
+			if p.Team == myTeam then
+				sameTeamCount = sameTeamCount + 1
 			end
 		end
-
-		humanoidPrevHealth[player] = newHealth
-	end)
-end
-
--- bind existing players and future players
-local function bindPlayer(player)
-	-- cleanup on removal
-	player.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			-- player removed from game
-			if humanoidConns[player] then pcall(function() humanoidConns[player]:Disconnect() end) end
-			humanoidConns[player] = nil
-			humanoidPrevHealth[player] = nil
-		end
-	end)
-
-	player.CharacterAdded:Connect(function(char)
-		-- small delay to let humanoid populate
-		task.wait(0.05)
-		local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 3)
-		if humanoid then
-			attachHumanoid(player, humanoid)
-		end
-	end)
-
-	-- if character already exists, attach now
-	if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-		attachHumanoid(player, player.Character:FindFirstChildOfClass("Humanoid"))
 	end
+
+	if totalOthers > 0 and sameTeamCount == totalOthers then
+		return true
+	end
+
+	return false
 end
 
-for _,p in ipairs(Players:GetPlayers()) do
-	bindPlayer(p)
+-- enemy test (no wall checks here per your request)
+local function isEnemy(player)
+	if player == LocalPlayer then return false end
+	if not isAlive(player) then return false end
+	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+
+	if isFFA() then
+		return true
+	end
+
+	-- normal team-based check
+	if LocalPlayer.Team == nil or player.Team == nil then
+		-- conservative: if teams undefined, treat as non-enemy unless isFFA() true
+		return false
+	end
+
+	return player.Team ~= LocalPlayer.Team
 end
-Players.PlayerAdded:Connect(bindPlayer)
-Players.PlayerRemoving:Connect(function(p)
-	-- cleanup
-	if humanoidConns[p] then pcall(function() humanoidConns[p]:Disconnect() end) end
-	humanoidConns[p] = nil
-	humanoidPrevHealth[p] = nil
-	destroyHighlightFor(p)
-	if previousClosest == p then previousClosest = nil end
-end)
 
 -- ESP button (full width, like Aimbot)
 local espButton = Instance.new("TextButton")
@@ -234,13 +153,13 @@ ffaBtn.MouseButton1Click:Connect(function()
 	_G.ForceFFA = not _G.ForceFFA
 	ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
 	ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-	-- resetting highlights so the UI immediately reflects mode change
+	-- resetting highlights is useful so the UI immediately reflects mode change
 	if espOn then
 		ClearESP()
 	end
 end)
 
--- small label on right showing current auto-FFA heuristic result
+-- (Optional) small label on right showing current auto-FFA heuristic result
 local heurLabel = Instance.new("TextLabel")
 heurLabel.Size = UDim2.new(0.48, -4, 0, 30)
 heurLabel.Position = UDim2.new(0.52, 0, 0, 50)
@@ -251,70 +170,13 @@ heurLabel.TextSize = 14
 heurLabel.Text = "" -- updated live
 heurLabel.Parent = playerTab
 
--- helper: isFFA now includes friendly-fire detection
-local function isFFA()
-	-- manual override
-	if _G.ForceFFA then return true end
-
-	-- if we recently detected friendly fire, treat as FFA
-	if friendlyFireDetected and tick() < friendlyFireExpiry then
-		return true
-	elseif friendlyFireDetected and tick() >= friendlyFireExpiry then
-		-- expiry passed -> clear flag
-		friendlyFireDetected = false
-	end
-
-	-- existing heuristics below
-	local anyTeamAssigned = false
-	for _,p in ipairs(Players:GetPlayers()) do
-		if p.Team ~= nil then
-			anyTeamAssigned = true
-			break
-		end
-	end
-	if not anyTeamAssigned then
-		return true
-	end
-
-	local myTeam = LocalPlayer.Team
-	local totalOthers = 0
-	local sameTeamCount = 0
-	for _,p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			totalOthers = totalOthers + 1
-			if p.Team == myTeam then
-				sameTeamCount = sameTeamCount + 1
-			end
-		end
-	end
-
-	if totalOthers > 0 and sameTeamCount == totalOthers then
-		return true
-	end
-
-	return false
-end
-
--- Hard-refresh helper to rebuild broken highlights if something changed
-task.spawn(function()
-	while true do
-		if espOn then
-			for p, hl in pairs(espHighlights) do
-				local char = p.Character
-				if not hl or not hl.Parent or not char or hl.Adornee ~= char then
-					destroyHighlightFor(p)
-				end
-			end
-		end
-		task.wait(0.5)
-	end
-end)
-
 -- main update loop (single loop to handle highlights + closest)
 RunService.RenderStepped:Connect(function()
 	heurLabel.Text = isFFA() and "Mode: FFA" or "Mode: Teams"
 
 	if not espOn then
+		-- ensure cleaned up
+		-- (don't ClearESP every tick to avoid GC thrash; only if not already empty)
 		if next(espHighlights) then ClearESP() end
 		return
 	end
@@ -331,59 +193,32 @@ RunService.RenderStepped:Connect(function()
 	local seen = {}
 
 	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and isAlive(player) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			-- treat as enemy depending on isFFA / teams
-			local function isEnemyLocal(p)
-				if p == LocalPlayer then return false end
-				if not isAlive(p) then return false end
-				if not p.Character or not p.Character:FindFirstChild("HumanoidRootPart") then return false end
+		if isEnemy(player) then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local dist = (hrp.Position - myHRP.Position).Magnitude
+				if dist <= MAX_DISTANCE then
+					seen[player] = true
+					-- create highlight if missing
+					if not espHighlights[player] or not espHighlights[player].Parent then
+						if espHighlights[player] then pcall(function() espHighlights[player]:Destroy() end) end
+						local ok, hl = pcall(function()
+							local h = Instance.new("Highlight")
+							h.Adornee = char
+							h.FillTransparency = 1
+							h.OutlineTransparency = 0
+							h.OutlineColor = Color3.fromRGB(255,0,0)
+							h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+							h.Parent = CoreGui
+							return h
+						end)
+						if ok and hl then espHighlights[player] = hl end
+					end
 
-				if isFFA() then
-					return true
-				end
-
-				if LocalPlayer.Team == nil or p.Team == nil then
-					return false
-				end
-
-				return p.Team ~= LocalPlayer.Team
-			end
-
-			if isEnemyLocal(player) then
-				local char = player.Character
-				local hrp = char and char:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					local dist = (hrp.Position - myHRP.Position).Magnitude
-					if dist <= MAX_DISTANCE then
-						seen[player] = true
-						-- create or ensure highlight
-						if not espHighlights[player] or not espHighlights[player].Parent then
-							if espHighlights[player] then pcall(function() espHighlights[player]:Destroy() end) end
-							local ok, hl = pcall(function()
-								local h = Instance.new("Highlight")
-								h.Adornee = char
-								h.FillTransparency = 1
-								h.OutlineTransparency = 0
-								h.OutlineColor = Color3.fromRGB(255,0,0)
-								h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-								h.Parent = CoreGui
-								return h
-							end)
-							if ok and hl then espHighlights[player] = hl end
-						else
-							-- Force-update adornee & default color to avoid stale visuals
-							pcall(function()
-								espHighlights[player].Adornee = char
-								if not (_G.ClosestPlayerESP and player == closestPlayer) then
-									espHighlights[player].OutlineColor = Color3.fromRGB(255, 0, 0)
-								end
-							end)
-						end
-
-						if dist < closestDist then
-							closestDist = dist
-							closestPlayer = player
-						end
+					if dist < closestDist then
+						closestDist = dist
+						closestPlayer = player
 					end
 				end
 			end
@@ -397,6 +232,7 @@ RunService.RenderStepped:Connect(function()
 
 	-- Handle closest-player coloring + tracking line
 	if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] then
+		-- reset previous if changed
 		if previousClosest and previousClosest ~= closestPlayer then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
@@ -432,7 +268,11 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- clean up highlights on player removal handled above
+-- cleanup on player events
+Players.PlayerRemoving:Connect(function(p)
+	destroyHighlightFor(p)
+	if previousClosest == p then previousClosest = nil end
+end)
 
 LocalPlayer.CharacterAdded:Connect(function()
 	ClearESP()
