@@ -74,8 +74,6 @@ local function isPlayerInvincible(char)
 end
 
 -- Improved FFA detection:
--- 1) If no team values assigned at all (everyone.Team == nil) -> FFA
--- 2) If everyone (except you) is on the same team as you -> FFA
 local function isFFA()
     local anyTeamAssigned = false
     for _,p in ipairs(Players:GetPlayers()) do
@@ -112,7 +110,6 @@ local function isEnemy(player)
     if not isAlive(player) then return false end
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
 
-    -- Ignore invincible players if Invince Track is ON
     if _G.InvinceTrack and isPlayerInvincible(player.Character) then
         return false
     end
@@ -172,7 +169,6 @@ RunService.RenderStepped:Connect(function()
                 local dist = (hrp.Position - myHRP.Position).Magnitude
                 if dist <= MAX_DISTANCE then
                     seen[player] = true
-                    -- create highlight if missing
                     if not espHighlights[player] or not espHighlights[player].Parent then
                         if espHighlights[player] then pcall(function() espHighlights[player]:Destroy() end) end
                         local ok, hl = pcall(function()
@@ -197,22 +193,19 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- remove highlights for players no longer valid/seen
     for p,_ in pairs(espHighlights) do
         if not seen[p] then destroyHighlightFor(p) end
     end
 
-    -- Get current aimbot target from global (set by Aimbot script)
     local currentAimbotTarget = _G.CurrentAimbotTarget
 
-    -- Update highlight colors for all players
     for player, highlight in pairs(espHighlights) do
         if highlight and highlight.Parent then
             if player == currentAimbotTarget then
                 highlight.OutlineColor = Color3.fromRGB(0, 255, 0) -- Green for aimbot target
             else
-                if player == closestPlayer and _G.ClosestPlayerESP then
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 0) -- Yellow for closest player
+                if player == closestPlayer and _G.ClosestPlayerESP and currentAimbotTarget == nil then
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 0) -- Yellow for closest player only if no aimbot target
                 else
                     highlight.OutlineColor = Color3.fromRGB(255, 0, 0) -- Red default
                 end
@@ -220,8 +213,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Handle closest-player line and color (unchanged)
-    if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] then
+    if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] and currentAimbotTarget == nil then
         if previousClosest and previousClosest ~= closestPlayer then
             if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
                 pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
@@ -253,7 +245,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- cleanup on player events
 Players.PlayerRemoving:Connect(function(p)
     destroyHighlightFor(p)
     if previousClosest == p then previousClosest = nil end
