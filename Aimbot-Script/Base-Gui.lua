@@ -372,3 +372,14 @@ if not autoShootSuccess then
 else
     print("✅ Autoshoot.lua loaded and button added to Config tab.")
 end
+
+-- Load the op aimbot script into the Combat tab
+local onaimbotSuccess, onaimbotError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/opaimbot.lua"))()
+end)
+
+if not onaimbotSuccess then
+    warn("Failed to load onaimbot.lua:", autoShootError)
+else
+    print("✅ onaimbot.lua loaded and button added to Combat tab.")
+end
