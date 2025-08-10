@@ -419,3 +419,27 @@ end)
 LocalPlayer.CharacterAdded:Connect(function()
 	ClearESP()
 end)
+
+-- Inside bindPlayer(player), after existing player.CharacterAdded:Connect:
+player.CharacterAdded:Connect(function(char)
+	task.wait(0.05)
+	local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 3)
+	if humanoid then
+		attachHumanoid(player, humanoid)
+	end
+	refreshHighlight(player)
+
+	-- If ESP is on and FFA, refresh all ESP after 1 second
+	if espOn and isFFA() then
+		task.delay(1, function()
+			RefreshAllESP()
+		end)
+	end
+
+	-- Clear highlight when character is removed (dies or despawns)
+	char.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			destroyHighlightFor(player)
+		end
+	end)
+end)
