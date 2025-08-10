@@ -3,68 +3,62 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
 
--- Wait for config tab
+--// AutoShootButton.lua
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Wait for Config tab to exist
 local configTab
 repeat
     configTab = _G.Tabs and _G.Tabs.Config
     task.wait(0.1)
 until configTab
 
-local autoShootOn = true
-local shootInterval = 0.15
+-- Auto Shoot variables
+local autoShootOn = true  -- Starts ON
+local shootInterval = 0.1 -- Seconds between shots
 
--- Create Auto Shoot button
+-- Create Auto Shoot toggle button
 local autoShootButton = Instance.new("TextButton")
 autoShootButton.Size = UDim2.new(1, 0, 0, 35)
-autoShootButton.Position = UDim2.new(0, 0, 0, 130)
-autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-autoShootButton.TextColor3 = Color3.new(1,1,1)
+autoShootButton.Position = UDim2.new(0, 0, 0, 130) -- Adjust Y if needed
+autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- Green = ON
+autoShootButton.TextColor3 = Color3.new(1, 1, 1)
 autoShootButton.Font = Enum.Font.GothamBold
 autoShootButton.TextSize = 18
 autoShootButton.Text = "Auto Shoot: On"
 autoShootButton.Parent = configTab
-Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
 
--- Create invisible Fire button GUI (simulate real user tap)
-local fireButton = Instance.new("TextButton")
-fireButton.Name = "FireButton"
-fireButton.Size = UDim2.new(0, 1, 0, 1) -- tiny, invisible
-fireButton.Position = UDim2.new(0.5, -0.5, 0.5, -0.5) -- center screen
-fireButton.BackgroundTransparency = 1
-fireButton.AutoButtonColor = false
-fireButton.Visible = false
-fireButton.Parent = PlayerGui
+-- Function to trigger shooting by activating the tool
+local function doAutoShoot()
+    local character = LocalPlayer.Character
+    if not character then return end
 
--- Function to simulate pressing the FireButton (trigger its MouseButton1Down and MouseButton1Up)
-local function simulateTap()
-    fireButton:CaptureFocus()
-    fireButton.InputBegan:Wait() -- waits for input, but we want to simulate input, so:
-    -- Instead, we fire the events directly:
-    fireButton:MouseButton1Down()
-    task.wait(0.02)
-    fireButton:MouseButton1Up()
-end
-
--- But Roblox GUI buttons do not have MouseButton1Down/Up methods, so better use :Activate()
-
-local function doFire()
-    fireButton:Activate()
+    -- Find the tool equipped
+    local tool = character:FindFirstChildOfClass("Tool")
+    if tool then
+        -- Activate tool to shoot
+        tool:Activate()
+    end
 end
 
 -- Auto shoot loop
-task.spawn(function()
+spawn(function()
     while true do
-        if autoShootOn and _G.CurrentAimbotTarget then
-            doFire()
-            task.wait(shootInterval)
-        else
-            task.wait(0.1)
+        if autoShootOn and _G.CurrentAimbotTarget ~= nil then
+            doAutoShoot()
         end
+        task.wait(shootInterval)
     end
 end)
 
+-- Toggle button logic
 autoShootButton.MouseButton1Click:Connect(function()
     autoShootOn = not autoShootOn
     autoShootButton.Text = "Auto Shoot: " .. (autoShootOn and "On" or "Off")
-    autoShootButton.BackgroundColor3 = autoShootOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40,40,40)
+    autoShootButton.BackgroundColor3 = autoShootOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 end)
