@@ -83,6 +83,8 @@ end
 -- Aimbot variables
 local aimbotOn = false
 local currentAimbotTarget = nil
+local currentTargetHumanoid = nil
+local deathConn = nil
 
 -- Create Aimbot toggle button
 local aimbotButton = Instance.new("TextButton")
@@ -109,6 +111,15 @@ if hasDrawing and DrawingNew then
     end
 end
 
+-- Cleanup function for aimbot target death connection
+local function cleanupDeathConnection()
+    if deathConn then
+        deathConn:Disconnect()
+        deathConn = nil
+        currentTargetHumanoid = nil
+    end
+end
+
 -- Toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
     aimbotOn = not aimbotOn
@@ -118,6 +129,7 @@ aimbotButton.MouseButton1Click:Connect(function()
     if not aimbotOn then
         currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         if aimbotLine then aimbotLine.Visible = false end
     end
 end)
@@ -128,6 +140,7 @@ RunService.RenderStepped:Connect(function()
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         return
     end
 
@@ -135,6 +148,7 @@ RunService.RenderStepped:Connect(function()
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         return
     end
 
@@ -143,6 +157,7 @@ RunService.RenderStepped:Connect(function()
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         return
     end
 
@@ -154,21 +169,13 @@ RunService.RenderStepped:Connect(function()
             if char then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 local head = char:FindFirstChild("Head")
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
 
-                if hrp then
+                if hrp and humanoid and humanoid.Health > 0 then
                     local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
                     if distToPlayer <= MAX_DISTANCE then
-                        -- Try torso first
-                        if isVisible(hrp.Position, char) and hasLineOfSight(Camera.CFrame.Position, hrp.Position, {LocalPlayer.Character, char}) then
-                            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
-                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                            if fov < AIMBOT_FOV and fov < bestVal then
-                                closestPlayer = player
-                                closestPart = hrp
-                                bestVal = fov
-                            end
-                        elseif head and isVisible(head.Position, char) and hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
-                            -- If torso not visible, track head if visible
+                        -- Prioritize HEAD over TORSO
+                        if head and isVisible(head.Position, char) and hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
                             local screenPos = Camera:WorldToViewportPoint(head.Position)
                             local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
                             if fov < AIMBOT_FOV and fov < bestVal then
@@ -176,8 +183,15 @@ RunService.RenderStepped:Connect(function()
                                 closestPart = head
                                 bestVal = fov
                             end
+                        elseif isVisible(hrp.Position, char) and hasLineOfSight(Camera.CFrame.Position, hrp.Position, {LocalPlayer.Character, char}) then
+                            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                            if fov < AIMBOT_FOV and fov < bestVal then
+                                closestPlayer = player
+                                closestPart = hrp
+                                bestVal = fov
+                            end
                         else
-                            -- If neither torso nor head visible, try any other part
                             for _, part in ipairs(char:GetChildren()) do
                                 if part:IsA("BasePart") and part ~= hrp and part ~= head then
                                     if isVisible(part.Position, char) and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character, char}) then
@@ -198,8 +212,27 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    currentAimbotTarget = closestPlayer
-    _G.CurrentAimbotTarget = currentAimbotTarget
+    -- If target changed, disconnect previous death event
+    if currentAimbotTarget ~= closestPlayer then
+        cleanupDeathConnection()
+        currentAimbotTarget = closestPlayer
+        _G.CurrentAimbotTarget = currentAimbotTarget
+
+        if currentAimbotTarget then
+            local char = currentAimbotTarget.Character
+            if char then
+                currentTargetHumanoid = char:FindFirstChildOfClass("Humanoid")
+                if currentTargetHumanoid then
+                    deathConn = currentTargetHumanoid.Died:Connect(function()
+                        currentAimbotTarget = nil
+                        _G.CurrentAimbotTarget = nil
+                        cleanupDeathConnection()
+                        if aimbotLine then aimbotLine.Visible = false end
+                    end)
+                end
+            end
+        end
+    end
 
     if currentAimbotTarget and closestPart then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
