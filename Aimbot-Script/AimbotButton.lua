@@ -1,3 +1,4 @@
+--// AimbotButton.lua [ loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))() ]
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -5,21 +6,22 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local combatTab = _G.Tabs and _G.Tabs.Combat
-if not combatTab then
-    warn("Combat tab not found! Cannot create buttons.")
-    return
-end
+-- Wait for combat tab to exist
+local combatTab
+repeat
+    combatTab = _G.Tabs and _G.Tabs.Combat
+    wait(0.1)
+until combatTab
 
 local MAX_DISTANCE = 500
 
---// ===== AIMBOT SECTION =====
+-- ===== AIMBOT SECTION =====
 
 local aimbotOn = false
 local currentAimbotTarget = nil
 local clicking = false
 
--- Aimbot toggle button
+-- Create Aimbot toggle button
 local aimbotButton = Instance.new("TextButton")
 aimbotButton.Size = UDim2.new(1, 0, 0, 35)
 aimbotButton.Position = UDim2.new(0, 0, 0, 10)
@@ -31,20 +33,7 @@ aimbotButton.Text = "Aimbot: Off"
 aimbotButton.Parent = combatTab
 Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
 
-aimbotButton.MouseButton1Click:Connect(function()
-    aimbotOn = not aimbotOn
-    aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
-    aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
-
-    if not aimbotOn then
-        currentAimbotTarget = nil
-        aimbotLine.Visible = false
-        trackingText.Text = "Tracking Nobody"
-        stopClicking()
-    end
-end)
-
--- Helper functions for aimbot
+-- Helper functions
 local function isAlive(player)
     return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
 end
@@ -80,7 +69,7 @@ local function isVisible(position, character)
     return ray and character:IsAncestorOf(ray.Instance) or not ray
 end
 
--- Auto-click helper functions
+-- Auto-click helpers
 local function safeSendClick(x, y)
     pcall(function()
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
@@ -113,7 +102,7 @@ local function stopClicking()
     clicking = false
 end
 
--- Aimbot visual helpers
+-- Aimbot visuals
 local aimbotLine = Drawing.new("Line")
 aimbotLine.Color = Color3.new(0, 1, 0)
 aimbotLine.Thickness = 2
@@ -129,6 +118,20 @@ trackingText.TextSize = 16
 trackingText.Text = "Tracking Nobody"
 trackingText.Parent = LocalPlayer:WaitForChild("PlayerGui")
 trackingText.Visible = true
+
+-- Aimbot toggle logic
+aimbotButton.MouseButton1Click:Connect(function()
+    aimbotOn = not aimbotOn
+    aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
+    aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+
+    if not aimbotOn then
+        currentAimbotTarget = nil
+        aimbotLine.Visible = false
+        trackingText.Text = "Tracking Nobody"
+        stopClicking()
+    end
+end)
 
 -- Aimbot main loop
 RunService.RenderStepped:Connect(function()
@@ -195,16 +198,16 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
---// ===== KILL AURA SECTION =====
+-- ===== KILL AURA SECTION =====
 
 local killAuraOn = false
 local killAuraTarget = nil
 local killAuraClicking = false
 
--- Kill Aura toggle button
+-- Create Kill Aura toggle button
 local killAuraButton = Instance.new("TextButton")
 killAuraButton.Size = UDim2.new(1, 0, 0, 35)
-killAuraButton.Position = UDim2.new(0, 0, 0, 50)
+killAuraButton.Position = UDim2.new(0, 0, 0, 55)
 killAuraButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 killAuraButton.TextColor3 = Color3.new(1, 1, 1)
 killAuraButton.Font = Enum.Font.GothamBold
@@ -213,19 +216,7 @@ killAuraButton.Text = "Kill Aura: Off"
 killAuraButton.Parent = combatTab
 Instance.new("UICorner", killAuraButton).CornerRadius = UDim.new(0, 6)
 
-killAuraButton.MouseButton1Click:Connect(function()
-    killAuraOn = not killAuraOn
-    killAuraButton.Text = "Kill Aura: " .. (killAuraOn and "On" or "Off")
-    killAuraButton.BackgroundColor3 = killAuraOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
-
-    if not killAuraOn then
-        killAuraTarget = nil
-        killAuraLine.Visible = false
-        killAuraStopClicking()
-    end
-end)
-
--- Kill Aura helper functions
+-- Kill Aura helpers
 local function isValidKillAuraTarget(player)
     if not player or player == LocalPlayer then return false end
     if not isAlive(player) then return false end
@@ -259,6 +250,19 @@ local function killAuraStopClicking()
     killAuraClicking = false
 end
 
+-- Kill Aura toggle logic
+killAuraButton.MouseButton1Click:Connect(function()
+    killAuraOn = not killAuraOn
+    killAuraButton.Text = "Kill Aura: " .. (killAuraOn and "On" or "Off")
+    killAuraButton.BackgroundColor3 = killAuraOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+
+    if not killAuraOn then
+        killAuraTarget = nil
+        killAuraLine.Visible = false
+        killAuraStopClicking()
+    end
+end)
+
 -- Kill Aura main loop
 RunService.RenderStepped:Connect(function()
     if not killAuraOn then
@@ -289,12 +293,10 @@ RunService.RenderStepped:Connect(function()
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local dist = (hrp.Position - myHRP.Position).Magnitude
-                if dist <= MAX_DISTANCE then
-                    if dist < bestDist then
-                        closestPlayer = player
-                        closestPart = hrp
-                        bestDist = dist
-                    end
+                if dist <= MAX_DISTANCE and dist < bestDist then
+                    closestPlayer = player
+                    closestPart = hrp
+                    bestDist = dist
                 end
             end
         end
@@ -312,3 +314,4 @@ RunService.RenderStepped:Connect(function()
         killAuraLine.Visible = false
         killAuraStopClicking()
     end
+end)
