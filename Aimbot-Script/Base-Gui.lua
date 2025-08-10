@@ -361,3 +361,14 @@ if not invinceTrackSuccess then
 else
     print("✅ Invincetrack.lua loaded and button should appear in Config tab.")
 end
+
+-- Load the AutoShoot script into the Config tab
+local autoShootSuccess, autoShootError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Autoshoot.lua"))()
+end)
+
+if not autoShootSuccess then
+    warn("Failed to load Autoshoot.lua:", autoShootError)
+else
+    print("✅ Autoshoot.lua loaded and button added to Config tab.")
+end
