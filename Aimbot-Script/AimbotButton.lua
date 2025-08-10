@@ -19,7 +19,6 @@ local MAX_DISTANCE = 500
 
 local aimbotOn = false
 local currentAimbotTarget = nil
-local clicking = false
 
 -- Create Aimbot toggle button
 local aimbotButton = Instance.new("TextButton")
@@ -33,91 +32,11 @@ aimbotButton.Text = "Aimbot: Off"
 aimbotButton.Parent = combatTab
 Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
 
--- Helper functions
-local function isAlive(player)
-    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
-end
-
-local function canDamageYou(player)
-    if not player or player == LocalPlayer then return false end
-    local myTeam = LocalPlayer.Team
-    local theirTeam = player.Team
-    if myTeam == nil or theirTeam == nil then return true end
-    return myTeam ~= theirTeam
-end
-
-local function hasSpawnProtection(player)
-    local char = player.Character
-    if not char then return false end
-    return char:FindFirstChildOfClass("ForceField") ~= nil
-end
-
-local function canBeDamaged(player)
-    if not player or player == LocalPlayer then return false end
-    if not isAlive(player) then return false end
-    if not canDamageYou(player) then return false end
-    if hasSpawnProtection(player) then return false end
-    return true
-end
-
-local function isVisible(position, character)
-    local origin = Camera.CFrame.Position
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local ray = workspace:Raycast(origin, (position - origin).Unit * 9999, rayParams)
-    return ray and character:IsAncestorOf(ray.Instance) or not ray
-end
-
--- Auto-click helpers
-local function safeSendClick(x, y)
-    pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-        wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
-    end)
-end
-
-local function getRandomOffset()
-    return math.random(-3, 3), math.random(-3, 3)
-end
-
-local clickingCoroutine = nil
-local function startClicking()
-    if clicking then return end
-    clicking = true
-    clickingCoroutine = coroutine.create(function()
-        while clicking and currentAimbotTarget and isAlive(currentAimbotTarget) do
-            local cx, cy = Camera.ViewportSize.X * 0.9, Camera.ViewportSize.Y / 2
-            local offsetX, offsetY = getRandomOffset()
-            safeSendClick(cx + offsetX, cy + offsetY)
-            wait(0.01)
-        end
-        clicking = false
-    end)
-    coroutine.resume(clickingCoroutine)
-end
-
-local function stopClicking()
-    clicking = false
-end
-
 -- Aimbot visuals
 local aimbotLine = Drawing.new("Line")
 aimbotLine.Color = Color3.new(0, 1, 0)
 aimbotLine.Thickness = 2
 aimbotLine.Visible = false
-
-local trackingText = Instance.new("TextLabel")
-trackingText.Size = UDim2.new(0, 250, 0, 25)
-trackingText.Position = UDim2.new(0.5, -125, 0, 10)
-trackingText.BackgroundTransparency = 1
-trackingText.TextColor3 = Color3.new(0, 1, 0)
-trackingText.Font = Enum.Font.GothamBold
-trackingText.TextSize = 16
-trackingText.Text = "Tracking Nobody"
-trackingText.Parent = LocalPlayer:WaitForChild("PlayerGui")
-trackingText.Visible = true
 
 -- Aimbot toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
@@ -128,32 +47,25 @@ aimbotButton.MouseButton1Click:Connect(function()
     if not aimbotOn then
         currentAimbotTarget = nil
         aimbotLine.Visible = false
-        trackingText.Text = "Tracking Nobody"
-        stopClicking()
     end
 end)
 
--- Aimbot main loop
+-- Aimbot main loop (no auto-click)
 RunService.RenderStepped:Connect(function()
     if not aimbotOn then
         aimbotLine.Visible = false
-        trackingText.Text = "Tracking Nobody"
-        stopClicking()
         currentAimbotTarget = nil
         return
     end
 
     if not LocalPlayer.Character or not isAlive(LocalPlayer) then
         aimbotLine.Visible = false
-        trackingText.Text = "Tracking Nobody"
-        stopClicking()
         currentAimbotTarget = nil
         return
     end
 
     local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then
-        stopClicking()
         return
     end
 
@@ -189,12 +101,8 @@ RunService.RenderStepped:Connect(function()
         aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
         aimbotLine.Visible = screenPos.Z > 0
-        trackingText.Text = "Tracking: " .. currentAimbotTarget.Name .. " (" .. math.floor((closestPart.Position - myHRP.Position).Magnitude) .. " studs)"
-        startClicking()
     else
         aimbotLine.Visible = false
-        trackingText.Text = "Tracking Nobody"
-        stopClicking()
     end
 end)
 
