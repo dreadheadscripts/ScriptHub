@@ -111,9 +111,9 @@ local function isEnemy(player)
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
 
 	-- Ignore invincible players if Invince Track is on
-	if _G.InvinceTrack and isPlayerInvincible(player.Character) then
-		return false
-	end
+	if _G.InvinceTrack == nil then
+    _G.InvinceTrack = false
+end
 
 	if isFFA() then
 		return true
