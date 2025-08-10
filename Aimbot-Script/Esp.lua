@@ -1,4 +1,4 @@
--- Esp.lua (with FFA detection, no Force FFA button)
+-- Esp.lua (with FFA detection, no Force FFA button, with Invince Track support)
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -20,7 +20,6 @@ local espHighlights = {}        -- [player] = Highlight
 local previousClosest = nil
 
 _G.ClosestPlayerESP = (_G.ClosestPlayerESP == nil) and false or _G.ClosestPlayerESP
-_G.InvinceTrack = (_G.InvinceTrack == nil) and false or _G.InvinceTrack
 
 -- Drawing line (if executor supports Drawing)
 local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
@@ -55,6 +54,18 @@ end
 
 local function isAlive(player)
 	return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChild("Humanoid").Health > 0
+end
+
+-- Invincibility check function
+local function isPlayerInvincible(char)
+    if not char then return false end
+    if char:FindFirstChildOfClass("ForceField") then return true end
+    if char:FindFirstChild("ForceField") then return true end
+    local spawnProt = char:FindFirstChild("SpawnProtection") or char:FindFirstChild("Invincible")
+    if spawnProt and spawnProt.Value == true then
+        return true
+    end
+    return false
 end
 
 -- Improved FFA detection:
@@ -94,24 +105,12 @@ local function isFFA()
 	return false
 end
 
--- New helper to check invincibility
-local function isPlayerInvincible(char)
-	if not char then return false end
-	if char:FindFirstChildOfClass("ForceField") then return true end
-	if char:FindFirstChild("ForceField") then return true end
-	local spawnProt = char:FindFirstChild("SpawnProtection") or char:FindFirstChild("Invincible")
-	if spawnProt and spawnProt.Value == true then
-		return true
-	end
-	return false
-end
-
 local function isEnemy(player)
 	if player == LocalPlayer then return false end
 	if not isAlive(player) then return false end
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
 
-	-- Skip if invince track is on and player is invincible
+	-- Ignore invincible players if Invince Track is on
 	if _G.InvinceTrack and isPlayerInvincible(player.Character) then
 		return false
 	end
@@ -120,7 +119,6 @@ local function isEnemy(player)
 		return true
 	end
 
-	-- normal team-based check
 	if LocalPlayer.Team == nil or player.Team == nil then
 		return false
 	end
@@ -145,27 +143,6 @@ espButton.MouseButton1Click:Connect(function()
 	espButton.Text = "ESP: " .. (espOn and "On" or "Off")
 	espButton.BackgroundColor3 = espOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
 	if not espOn then ClearESP() end
-end)
-
--- Invince Track toggle button (full width, below ESP button)
-local invinceBtn = Instance.new("TextButton")
-invinceBtn.Size = UDim2.new(1, 0, 0, 30)
-invinceBtn.Position = UDim2.new(0, 0, 0, 50) -- below ESP button (which is at 10, height 35)
-invinceBtn.BackgroundColor3 = _G.InvinceTrack and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-invinceBtn.Text = "Invince Track: " .. (_G.InvinceTrack and "On" or "Off")
-invinceBtn.Font = Enum.Font.GothamBold
-invinceBtn.TextSize = 16
-invinceBtn.TextColor3 = Color3.new(1,1,1)
-invinceBtn.Parent = playerTab
-Instance.new("UICorner", invinceBtn).CornerRadius = UDim.new(0,6)
-
-invinceBtn.MouseButton1Click:Connect(function()
-	_G.InvinceTrack = not _G.InvinceTrack
-	invinceBtn.Text = "Invince Track: " .. (_G.InvinceTrack and "On" or "Off")
-	invinceBtn.BackgroundColor3 = _G.InvinceTrack and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-	if espOn then
-		ClearESP() -- refresh highlights immediately
-	end
 end)
 
 -- main update loop (handles highlights and closest)
