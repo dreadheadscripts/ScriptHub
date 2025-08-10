@@ -124,7 +124,6 @@ RunService.RenderStepped:Connect(function()
         aimbotLine.Visible = false
     end
 end)
-
 -- ===== KILL AURA SECTION =====
 
 local killAuraOn = false
