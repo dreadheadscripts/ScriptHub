@@ -350,3 +350,14 @@ if not tpPlayerSuccess then
 else
     print("✅ TP Player loaded and button should appear in Player tab.")
 end
+
+-- Load the InvinceTrack script into the Config tab
+local invinceTrackSuccess, invinceTrackError = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Invincetrack.lua"))()
+end)
+
+if not invinceTrackSuccess then
+    warn("Failed to load Invincetrack.lua:", invinceTrackError)
+else
+    print("✅ Invincetrack.lua loaded and button should appear in Config tab.")
+end
