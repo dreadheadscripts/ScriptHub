@@ -65,47 +65,6 @@ local function isAlive(player)
 	return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChild("Humanoid").Health > 0
 end
 
--- Refresh or create highlight for a player’s current character
-local function refreshHighlight(player)
-	if not espOn then return end
-	if not isAlive(player) then
-		destroyHighlightFor(player)
-		return
-	end
-
-	local char = player.Character
-	if not char then
-		destroyHighlightFor(player)
-		return
-	end
-
-	local hl = espHighlights[player]
-	if not hl or not hl.Parent or hl.Adornee ~= char then
-		destroyHighlightFor(player)
-		local ok, newHl = pcall(function()
-			local h = Instance.new("Highlight")
-			h.Adornee = char
-			h.FillTransparency = 1
-			h.OutlineTransparency = 0
-			h.OutlineColor = Color3.fromRGB(255, 0, 0)
-			h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			h.Parent = CoreGui
-			return h
-		end)
-		if ok and newHl then
-			espHighlights[player] = newHl
-		end
-	end
-end
-
--- Refresh all highlights for all players (to keep ESP synced)
-local function RefreshAllESP()
-	if not espOn then return end
-	for _, player in ipairs(Players:GetPlayers()) do
-		refreshHighlight(player)
-	end
-end
-
 -- Attach to humanoid and detect friendly fire
 local function attachHumanoid(player, humanoid)
 	if not humanoid or not player then return end
@@ -187,14 +146,13 @@ local function attachHumanoid(player, humanoid)
 	end)
 end
 
--- Bind players and track character changes to keep highlights fresh
+-- Bind players
 local function bindPlayer(player)
 	player.AncestryChanged:Connect(function(_, parent)
 		if not parent then
 			if humanoidConns[player] then pcall(function() humanoidConns[player]:Disconnect() end) end
 			humanoidConns[player] = nil
 			humanoidPrevHealth[player] = nil
-			destroyHighlightFor(player)
 		end
 	end)
 
@@ -204,48 +162,23 @@ local function bindPlayer(player)
 		if humanoid then
 			attachHumanoid(player, humanoid)
 		end
-		refreshHighlight(player)
-		RefreshAllESP() -- Refresh all highlights when any player respawns
-
-		-- Clear highlight when character is removed (dies or despawns)
-		char.AncestryChanged:Connect(function(_, parent)
-			if not parent then
-				destroyHighlightFor(player)
-			end
-		end)
 	end)
 
-	-- Also clear highlight if character removed unexpectedly
-	if player.Character then
-		player.Character.AncestryChanged:Connect(function(_, parent)
-			if not parent then
-				destroyHighlightFor(player)
-			end
-		end)
-	end
-
-	-- Initial highlight creation if character exists
-	if player.Character and isAlive(player) then
-		refreshHighlight(player)
+	if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+		attachHumanoid(player, player.Character:FindFirstChildOfClass("Humanoid"))
 	end
 end
 
 for _,p in ipairs(Players:GetPlayers()) do
 	bindPlayer(p)
 end
-
-Players.PlayerAdded:Connect(function(p)
-	bindPlayer(p)
-	RefreshAllESP() -- Refresh all highlights on player join
-end)
-
+Players.PlayerAdded:Connect(bindPlayer)
 Players.PlayerRemoving:Connect(function(p)
 	if humanoidConns[p] then pcall(function() humanoidConns[p]:Disconnect() end) end
 	humanoidConns[p] = nil
 	humanoidPrevHealth[p] = nil
 	destroyHighlightFor(p)
 	if previousClosest == p then previousClosest = nil end
-	RefreshAllESP() -- Refresh all highlights on player leave
 end)
 
 -- ESP button
@@ -262,10 +195,28 @@ Instance.new("UICorner", espButton).CornerRadius = UDim.new(0,6)
 
 espButton.MouseButton1Click:Connect(function()
 	espOn = not espOn
-	_G.ForceFFA = espOn  -- Enable force FFA while ESP is on, disable otherwise
 	espButton.Text = "ESP: " .. (espOn and "On" or "Off")
 	espButton.BackgroundColor3 = espOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
 	if not espOn then ClearESP() end
+end)
+
+-- Force FFA toggle
+local ffaBtn = Instance.new("TextButton")
+ffaBtn.Size = UDim2.new(0.48, -4, 0, 30)
+ffaBtn.Position = UDim2.new(0, 0, 0, 50)
+ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
+ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
+ffaBtn.Font = Enum.Font.GothamBold
+ffaBtn.TextSize = 16
+ffaBtn.TextColor3 = Color3.new(1,1,1)
+ffaBtn.Parent = playerTab
+Instance.new("UICorner", ffaBtn).CornerRadius = UDim.new(0,6)
+
+ffaBtn.MouseButton1Click:Connect(function()
+	_G.ForceFFA = not _G.ForceFFA
+	ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
+	ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
+	if espOn then ClearESP() end
 end)
 
 -- Heuristic label
@@ -303,7 +254,7 @@ local function isFFA()
 	return false
 end
 
--- Refresh highlights periodically to catch stale highlights
+-- Refresh highlights
 task.spawn(function()
 	while true do
 		if espOn then
@@ -318,7 +269,7 @@ task.spawn(function()
 	end
 end)
 
--- Main loop for ESP logic
+-- Main loop
 RunService.RenderStepped:Connect(function()
 	heurLabel.Text = isFFA() and "Mode: FFA" or "Mode: Teams"
 
@@ -336,46 +287,48 @@ RunService.RenderStepped:Connect(function()
 	local closestPlayer, closestDist = nil, math.huge
 	local seen = {}
 
-	local function isEnemyLocal(p)
-		if p == LocalPlayer then return false end
-		if not isAlive(p) then return false end
-		if not p.Character:FindFirstChild("HumanoidRootPart") then return false end
-		if isFFA() then return true end
-		if LocalPlayer.Team == nil or p.Team == nil then return false end
-		return p.Team ~= LocalPlayer.Team
-	end
-
 	for _, player in ipairs(Players:GetPlayers()) do
-		if isEnemyLocal(player) then
-			local hrp = player.Character.HumanoidRootPart
-			local dist = (hrp.Position - myHRP.Position).Magnitude
-			if dist <= MAX_DISTANCE then
-				seen[player] = true
-				if not espHighlights[player] or not espHighlights[player].Parent then
-					if espHighlights[player] then pcall(function() espHighlights[player]:Destroy() end) end
-					local ok, hl = pcall(function()
-						local h = Instance.new("Highlight")
-						h.Adornee = player.Character
-						h.FillTransparency = 1
-						h.OutlineTransparency = 0
-						h.OutlineColor = Color3.fromRGB(255,0,0)
-						h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-						h.Parent = CoreGui
-						return h
-					end)
-					if ok and hl then espHighlights[player] = hl end
-				else
-					pcall(function()
-						espHighlights[player].Adornee = player.Character
-						if not (_G.ClosestPlayerESP and player == closestPlayer) then
-							espHighlights[player].OutlineColor = Color3.fromRGB(255, 0, 0)
-						end
-					end)
-				end
+		if player ~= LocalPlayer and isAlive(player) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local function isEnemyLocal(p)
+				if p == LocalPlayer then return false end
+				if not isAlive(p) then return false end
+				if not p.Character:FindFirstChild("HumanoidRootPart") then return false end
+				if isFFA() then return true end
+				if LocalPlayer.Team == nil or p.Team == nil then return false end
+				return p.Team ~= LocalPlayer.Team
+			end
 
-				if dist < closestDist then
-					closestDist = dist
-					closestPlayer = player
+			if isEnemyLocal(player) then
+				local hrp = player.Character.HumanoidRootPart
+				local dist = (hrp.Position - myHRP.Position).Magnitude
+				if dist <= MAX_DISTANCE then
+					seen[player] = true
+					if not espHighlights[player] or not espHighlights[player].Parent then
+						if espHighlights[player] then pcall(function() espHighlights[player]:Destroy() end) end
+						local ok, hl = pcall(function()
+							local h = Instance.new("Highlight")
+							h.Adornee = player.Character
+							h.FillTransparency = 1
+							h.OutlineTransparency = 0
+							h.OutlineColor = Color3.fromRGB(255,0,0)
+							h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+							h.Parent = CoreGui
+							return h
+						end)
+						if ok and hl then espHighlights[player] = hl end
+					else
+						pcall(function()
+							espHighlights[player].Adornee = player.Character
+							if not (_G.ClosestPlayerESP and player == closestPlayer) then
+								espHighlights[player].OutlineColor = Color3.fromRGB(255, 0, 0)
+							end
+						end)
+					end
+
+					if dist < closestDist then
+						closestDist = dist
+						closestPlayer = player
+					end
 				end
 			end
 		end
@@ -418,28 +371,4 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function()
 	ClearESP()
-end)
-
--- Inside bindPlayer(player), after existing player.CharacterAdded:Connect:
-player.CharacterAdded:Connect(function(char)
-	task.wait(0.05)
-	local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 3)
-	if humanoid then
-		attachHumanoid(player, humanoid)
-	end
-	refreshHighlight(player)
-
-	-- If ESP is on and FFA, refresh all ESP after 1 second
-	if espOn and isFFA() then
-		task.delay(1, function()
-			RefreshAllESP()
-		end)
-	end
-
-	-- Clear highlight when character is removed (dies or despawns)
-	char.AncestryChanged:Connect(function(_, parent)
-		if not parent then
-			destroyHighlightFor(player)
-		end
-	end)
 end)
