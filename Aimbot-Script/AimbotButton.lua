@@ -19,6 +19,7 @@ local MAX_DISTANCE = 500
 
 local aimbotOn = false
 local currentAimbotTarget = nil
+local currentAimbotPart = nil
 
 -- Create Aimbot toggle button
 local aimbotButton = Instance.new("TextButton")
@@ -38,6 +39,13 @@ aimbotLine.Color = Color3.new(0, 1, 0)
 aimbotLine.Thickness = 2
 aimbotLine.Visible = false
 
+-- Wall check function
+local function hasLineOfSight(fromPos, toPos, ignoreList)
+    local ray = Ray.new(fromPos, (toPos - fromPos))
+    local hitPart = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList or {})
+    return hitPart == nil or hitPart:IsDescendantOf(Players:GetPlayerFromCharacter(hitPart.Parent) and hitPart.Parent or nil)
+end
+
 -- Aimbot toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
     aimbotOn = not aimbotOn
@@ -46,46 +54,56 @@ aimbotButton.MouseButton1Click:Connect(function()
 
     if not aimbotOn then
         currentAimbotTarget = nil
+        currentAimbotPart = nil
         aimbotLine.Visible = false
     end
 end)
 
--- Aimbot main loop (no auto-click)
+-- Aimbot main loop
 RunService.RenderStepped:Connect(function()
     if not aimbotOn then
         aimbotLine.Visible = false
         currentAimbotTarget = nil
+        currentAimbotPart = nil
         return
     end
 
     if not LocalPlayer.Character or not isAlive(LocalPlayer) then
         aimbotLine.Visible = false
         currentAimbotTarget = nil
+        currentAimbotPart = nil
         return
     end
 
     local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myHRP then
-        return
-    end
+    if not myHRP then return end
 
     local closestPlayer, closestPart, bestVal = nil, nil, math.huge
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and canBeDamaged(player) then
+        if player ~= LocalPlayer 
+        and player.Team ~= LocalPlayer.Team -- Team check
+        and canBeDamaged(player) then
+
             local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
+            if char then
+                local distToPlayer = (char:GetPivot().Position - myHRP.Position).Magnitude
                 if distToPlayer <= MAX_DISTANCE then
-                    local head = char:FindFirstChild("Head")
-                    if head and isVisible(head.Position, char) then
-                        local screenPos = Camera:WorldToViewportPoint(head.Position)
-                        local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                        if fov < bestVal then
-                            closestPlayer = player
-                            closestPart = head
-                            bestVal = fov
+
+                    for _, part in ipairs(char:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                            if onScreen 
+                            and isVisible(part.Position, char)
+                            and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character}) then
+
+                                local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                                if fov < bestVal then
+                                    bestVal = fov
+                                    closestPlayer = player
+                                    closestPart = part
+                                end
+                            end
                         end
                     end
                 end
@@ -94,10 +112,11 @@ RunService.RenderStepped:Connect(function()
     end
 
     currentAimbotTarget = closestPlayer
+    currentAimbotPart = closestPart
 
-    if currentAimbotTarget and closestPart then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
-        local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
+    if currentAimbotTarget and currentAimbotPart then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, currentAimbotPart.Position)
+        local screenPos = Camera:WorldToViewportPoint(currentAimbotPart.Position)
         aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
         aimbotLine.Visible = screenPos.Z > 0
