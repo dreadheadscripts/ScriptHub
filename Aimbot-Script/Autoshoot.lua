@@ -1,6 +1,7 @@
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 -- Wait for config tab
 local configTab
@@ -10,7 +11,7 @@ repeat
 until configTab
 
 local autoShootOn = true
-local shootInterval = 0.1
+local shootInterval = 0.15 -- a bit slower to reduce input conflicts
 
 local autoShootButton = Instance.new("TextButton")
 autoShootButton.Size = UDim2.new(1, 0, 0, 35)
@@ -23,19 +24,24 @@ autoShootButton.Text = "Auto Shoot: On"
 autoShootButton.Parent = configTab
 Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
 
-spawn(function()
+local function doClick()
+    local centerX = Camera.ViewportSize.X / 2
+    local centerY = Camera.ViewportSize.Y / 2
+
+    -- Try UserInputService first with isProcessed false (may let mobile controls still work)
+    UserInputService:SendMouseButtonEvent(centerX, centerY, 0, true, game, false)
+    task.wait(0.03) -- hold click a tiny bit
+    UserInputService:SendMouseButtonEvent(centerX, centerY, 0, false, game, false)
+end
+
+task.spawn(function()
     while true do
         if autoShootOn and _G.CurrentAimbotTarget ~= nil then
-            local character = LocalPlayer.Character
-            if character then
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                local tool = humanoid and humanoid:FindFirstChildOfClass("Tool")
-                if tool and tool:FindFirstChild("Handle") then
-                    tool:Activate()
-                end
-            end
+            doClick()
+            task.wait(shootInterval)
+        else
+            task.wait(0.1)
         end
-        task.wait(shootInterval)
     end
 end)
 
