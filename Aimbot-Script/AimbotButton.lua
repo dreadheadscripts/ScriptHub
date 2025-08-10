@@ -1,4 +1,3 @@
---// AimbotButton.lua [ loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))() ]
 --// AimbotButton.lua
 --// Services
 local Players = game:GetService("Players")
@@ -15,6 +14,9 @@ repeat
     combatTab = _G.Tabs and _G.Tabs.Combat
     wait(0.1)
 until combatTab
+
+-- Initialize global tracking variable
+_G.CurrentAimbotTarget = nil
 
 -- Helper functions
 local function isAlive(player)
@@ -115,6 +117,7 @@ aimbotButton.MouseButton1Click:Connect(function()
 
     if not aimbotOn then
         currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
         if aimbotLine then aimbotLine.Visible = false end
     end
 end)
@@ -124,12 +127,14 @@ RunService.RenderStepped:Connect(function()
     if not aimbotOn then
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
         return
     end
 
     if not LocalPlayer.Character or not isAlive(LocalPlayer) then
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
         return
     end
 
@@ -137,6 +142,7 @@ RunService.RenderStepped:Connect(function()
     if not myHRP then
         if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
         return
     end
 
@@ -193,6 +199,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     currentAimbotTarget = closestPlayer
+    _G.CurrentAimbotTarget = currentAimbotTarget
 
     if currentAimbotTarget and closestPart then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
