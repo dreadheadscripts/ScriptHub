@@ -1,4 +1,4 @@
--- Esp.lua (without Force FFA toggle)
+-- Esp.lua (with FFA detection, no Force FFA button)
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -19,7 +19,6 @@ local espOn = false
 local espHighlights = {}        -- [player] = Highlight
 local previousClosest = nil
 
--- _G.ClosestPlayerESP toggle (still exists)
 _G.ClosestPlayerESP = (_G.ClosestPlayerESP == nil) and false or _G.ClosestPlayerESP
 
 -- Drawing line (if executor supports Drawing)
@@ -57,7 +56,7 @@ local function isAlive(player)
 	return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChild("Humanoid").Health > 0
 end
 
--- Improved FFA detection (no manual override):
+-- Improved FFA detection:
 -- 1) If no team values assigned at all (everyone.Team == nil) -> FFA
 -- 2) If everyone (except you) is on the same team as you -> FFA
 local function isFFA()
@@ -94,7 +93,6 @@ local function isFFA()
 	return false
 end
 
--- enemy test (no wall checks here per your request)
 local function isEnemy(player)
 	if player == LocalPlayer then return false end
 	if not isAlive(player) then return false end
@@ -106,7 +104,6 @@ local function isEnemy(player)
 
 	-- normal team-based check
 	if LocalPlayer.Team == nil or player.Team == nil then
-		-- conservative: if teams undefined, treat as non-enemy unless isFFA() true
 		return false
 	end
 
@@ -123,7 +120,7 @@ espButton.Font = Enum.Font.GothamBold
 espButton.TextSize = 18
 espButton.Text = "ESP: Off"
 espButton.Parent = playerTab
-local corner = Instance.new("UICorner", espButton); corner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", espButton).CornerRadius = UDim.new(0,6)
 
 espButton.MouseButton1Click:Connect(function()
 	espOn = not espOn
@@ -132,21 +129,8 @@ espButton.MouseButton1Click:Connect(function()
 	if not espOn then ClearESP() end
 end)
 
--- (Optional) small label on right showing current auto-FFA heuristic result
-local heurLabel = Instance.new("TextLabel")
-heurLabel.Size = UDim2.new(0.48, -4, 0, 30)
-heurLabel.Position = UDim2.new(0.52, 0, 0, 50)
-heurLabel.BackgroundTransparency = 1
-heurLabel.TextColor3 = Color3.new(1,1,1)
-heurLabel.Font = Enum.Font.Gotham
-heurLabel.TextSize = 14
-heurLabel.Text = "" -- updated live
-heurLabel.Parent = playerTab
-
--- main update loop (single loop to handle highlights + closest)
+-- main update loop (handles highlights and closest)
 RunService.RenderStepped:Connect(function()
-	heurLabel.Text = isFFA() and "Mode: FFA" or "Mode: Teams"
-
 	if not espOn then
 		if next(espHighlights) then ClearESP() end
 		return
@@ -202,14 +186,18 @@ RunService.RenderStepped:Connect(function()
 
 	-- Handle closest-player coloring + tracking line
 	if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] then
+		-- reset previous if changed
 		if previousClosest and previousClosest ~= closestPlayer then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
 			end
 		end
+
+		-- color closest yellow
 		pcall(function() espHighlights[closestPlayer].OutlineColor = Color3.fromRGB(255,255,0) end)
 		previousClosest = closestPlayer
 
+		-- update line
 		if _G.ClosestLine then
 			local hrp = closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart")
 			if hrp then
@@ -223,6 +211,7 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 	else
+		-- not enabled or no closest -> ensure line hidden and reset previous highlight
 		if previousClosest then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
