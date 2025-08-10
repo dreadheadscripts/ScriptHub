@@ -20,7 +20,7 @@ local shootInterval = 0.1  -- seconds between shots
 -- Create Auto Shoot toggle button
 local autoShootButton = Instance.new("TextButton")
 autoShootButton.Size = UDim2.new(1, 0, 0, 35)
-autoShootButton.Position = UDim2.new(0, 0, 0, 50) -- adjust Y if needed
+autoShootButton.Position = UDim2.new(0, 0, 0, 130) -- adjust Y if needed
 autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- green because ON
 autoShootButton.TextColor3 = Color3.new(1, 1, 1)
 autoShootButton.Font = Enum.Font.GothamBold
