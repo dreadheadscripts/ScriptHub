@@ -205,20 +205,34 @@ RunService.RenderStepped:Connect(function()
 		if not seen[p] then destroyHighlightFor(p) end
 	end
 
-	-- Handle closest-player coloring + tracking line
+	-- Get current aimbot target from global (set by Aimbot script)
+	local currentAimbotTarget = _G.CurrentAimbotTarget
+
+	-- Update highlight colors for all players
+	for player, highlight in pairs(espHighlights) do
+		if highlight and highlight.Parent then
+			if player == currentAimbotTarget then
+				highlight.OutlineColor = Color3.fromRGB(0, 255, 0) -- Green for aimbot target
+			else
+				if player == closestPlayer and _G.ClosestPlayerESP then
+					highlight.OutlineColor = Color3.fromRGB(255, 255, 0) -- Yellow for closest player
+				else
+					highlight.OutlineColor = Color3.fromRGB(255, 0, 0) -- Red default
+				end
+			end
+		end
+	end
+
+	-- Handle closest-player line and color (unchanged)
 	if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] then
-		-- reset previous if changed
 		if previousClosest and previousClosest ~= closestPlayer then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
 			end
 		end
-
-		-- color closest yellow
 		pcall(function() espHighlights[closestPlayer].OutlineColor = Color3.fromRGB(255,255,0) end)
 		previousClosest = closestPlayer
 
-		-- update line
 		if _G.ClosestLine then
 			local hrp = closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart")
 			if hrp then
@@ -232,7 +246,6 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 	else
-		-- not enabled or no closest -> ensure line hidden and reset previous highlight
 		if previousClosest then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
