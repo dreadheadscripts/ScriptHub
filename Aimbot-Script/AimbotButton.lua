@@ -207,7 +207,7 @@ local killAuraClicking = false
 -- Create Kill Aura toggle button
 local killAuraButton = Instance.new("TextButton")
 killAuraButton.Size = UDim2.new(1, 0, 0, 35)
-killAuraButton.Position = UDim2.new(0, 0, 0, 55)
+killAuraButton.Position = UDim2.new(0, 0, 0, 50)
 killAuraButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 killAuraButton.TextColor3 = Color3.new(1, 1, 1)
 killAuraButton.Font = Enum.Font.GothamBold
