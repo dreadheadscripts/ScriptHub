@@ -1,129 +1,166 @@
 --// AimbotButton.lua [ loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))() ]
+--// AimbotButton.lua
 --// Services
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
---// Globals
-local aimbotOn = false
-local killAuraOn = false
-_G.InvinceTrack = true -- default: ignore invincible players
+local MAX_DISTANCE = 500
+local AIMBOT_FOV = 300
 
---// Helper functions
+-- Wait for combat tab to exist
+local combatTab
+repeat
+    combatTab = _G.Tabs and _G.Tabs.Combat
+    wait(0.1)
+until combatTab
+
+-- Helper functions
 local function isAlive(player)
-	if not player.Character then return false end
-	local hum = player.Character:FindFirstChildOfClass("Humanoid")
-	return hum and hum.Health > 0
+    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
 end
 
-local function isPlayerInvincible(char)
-	if not char then return false end
-	if char:FindFirstChildOfClass("ForceField") then return true end
-	if char:FindFirstChild("ForceField") then return true end
-	local spawnProt = char:FindFirstChild("SpawnProtection") or char:FindFirstChild("Invincible")
-	return spawnProt and spawnProt.Value == true
+local function canBeDamaged(player)
+    if not player or player == LocalPlayer then return false end
+    local myTeam = LocalPlayer.Team
+    local theirTeam = player.Team
+    if myTeam == nil or theirTeam == nil then return true end
+    return myTeam ~= theirTeam
 end
 
-local function canDamageTarget(player)
-	-- Check if LocalPlayer can damage target based on team or other game logic
-	if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
-		return false -- same team
-	end
-	-- Add more custom checks here if the game has special damage rules
-	return true
+local function hasSpawnProtection(player)
+    local char = player.Character
+    if not char then return false end
+    return char:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function isVisible(position, character)
+    local origin = Camera.CFrame.Position
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+    local ray = workspace:Raycast(origin, (position - origin).Unit * 9999, rayParams)
+    return ray and character:IsAncestorOf(ray.Instance) or not ray
 end
 
 local function isEnemy(player)
-	if player == LocalPlayer then return false end
-	if not isAlive(player) then return false end
-	if not player.Character:FindFirstChild("HumanoidRootPart") then return false end
-
-	-- Invincible filter
-	if _G.InvinceTrack and isPlayerInvincible(player.Character) then
-		return false
-	end
-
-	-- Team/damage check
-	return canDamageTarget(player)
+    if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+        return false
+    end
+    if not canBeDamaged(player) then return false end
+    if hasSpawnProtection(player) then return false end
+    return true
 end
 
-local function getClosestEnemy()
-	local closest, dist = nil, math.huge
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if isEnemy(plr) then
-			local root = plr.Character:FindFirstChild("HumanoidRootPart")
-			if root then
-				local magnitude = (root.Position - Camera.CFrame.Position).Magnitude
-				if magnitude < dist then
-					dist = magnitude
-					closest = plr
-				end
-			end
-		end
-	end
-	return closest
+local function hasLineOfSight(fromPos, toPos, ignoreList)
+    local direction = (toPos - fromPos)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = ignoreList or {}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+    local raycastResult = workspace:Raycast(fromPos, direction, rayParams)
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        if hitPart and hitPart:IsDescendantOf(Players:GetPlayerFromCharacter(hitPart.Parent) and hitPart.Parent or nil) then
+            return true
+        end
+        return false
+    end
+    return true
 end
 
---// Aimbot logic
-RunService.RenderStepped:Connect(function()
-	if aimbotOn then
-		local target = getClosestEnemy()
-		if target and target.Character:FindFirstChild("Head") then
-			local headPos = target.Character.Head.Position
-			Camera.CFrame = CFrame.new(Camera.CFrame.Position, headPos)
-		end
-	end
-end)
+-- Aimbot variables
+local aimbotOn = false
+local currentAimbotTarget = nil
 
---// Kill Aura logic
-RunService.RenderStepped:Connect(function()
-	if killAuraOn then
-		local target = getClosestEnemy()
-		if target and target.Character:FindFirstChild("HumanoidRootPart") then
-			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-			VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-		end
-	end
-end)
-
---// Combat tab buttons
-local combatTab = script.Parent -- change if needed to the actual Combat tab reference
-
--- Aimbot Section
+-- Create Aimbot toggle button
 local aimbotButton = Instance.new("TextButton")
 aimbotButton.Size = UDim2.new(1, 0, 0, 35)
 aimbotButton.Position = UDim2.new(0, 0, 0, 10)
 aimbotButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-aimbotButton.TextColor3 = Color3.new(1,1,1)
+aimbotButton.TextColor3 = Color3.new(1, 1, 1)
 aimbotButton.Font = Enum.Font.GothamBold
 aimbotButton.TextSize = 18
 aimbotButton.Text = "Aimbot: Off"
 aimbotButton.Parent = combatTab
-Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
 
+-- Aimbot visuals (tracking line)
+local aimbotLine = Drawing.new("Line")
+aimbotLine.Color = Color3.new(0, 1, 0)
+aimbotLine.Thickness = 2
+aimbotLine.Visible = false
+
+-- Toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
-	aimbotOn = not aimbotOn
-	aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
-	aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
+    aimbotOn = not aimbotOn
+    aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
+    aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+
+    if not aimbotOn then
+        currentAimbotTarget = nil
+        aimbotLine.Visible = false
+    end
 end)
 
--- Kill Aura Section
-local killAuraButton = Instance.new("TextButton")
-killAuraButton.Size = UDim2.new(1, 0, 0, 35)
-killAuraButton.Position = UDim2.new(0, 0, 0, 50)
-killAuraButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-killAuraButton.TextColor3 = Color3.new(1,1,1)
-killAuraButton.Font = Enum.Font.GothamBold
-killAuraButton.TextSize = 18
-killAuraButton.Text = "Kill Aura: Off"
-killAuraButton.Parent = combatTab
-Instance.new("UICorner", killAuraButton).CornerRadius = UDim.new(0,6)
+-- Main aimbot loop
+RunService.RenderStepped:Connect(function()
+    if not aimbotOn then
+        aimbotLine.Visible = false
+        currentAimbotTarget = nil
+        return
+    end
 
-killAuraButton.MouseButton1Click:Connect(function()
-	killAuraOn = not killAuraOn
-	killAuraButton.Text = "Kill Aura: " .. (killAuraOn and "On" or "Off")
-	killAuraButton.BackgroundColor3 = killAuraOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
+    if not LocalPlayer.Character or not isAlive(LocalPlayer) then
+        aimbotLine.Visible = false
+        currentAimbotTarget = nil
+        return
+    end
+
+    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then
+        aimbotLine.Visible = false
+        currentAimbotTarget = nil
+        return
+    end
+
+    local closestPlayer, closestPart, bestVal = nil, nil, math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and isEnemy(player) then
+            local char = player.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
+                if distToPlayer <= MAX_DISTANCE then
+                    local head = char:FindFirstChild("Head")
+                    if head and isVisible(head.Position, char) then
+                        if hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
+                            local screenPos = Camera:WorldToViewportPoint(head.Position)
+                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                            if fov < AIMBOT_FOV and fov < bestVal then
+                                closestPlayer = player
+                                closestPart = head
+                                bestVal = fov
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    currentAimbotTarget = closestPlayer
+
+    if currentAimbotTarget and closestPart then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
+        local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
+        aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
+        aimbotLine.Visible = screenPos.Z > 0
+    else
+        aimbotLine.Visible = false
+    end
 end)
