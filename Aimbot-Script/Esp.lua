@@ -21,6 +21,11 @@ local previousClosest = nil
 
 _G.ClosestPlayerESP = (_G.ClosestPlayerESP == nil) and false or _G.ClosestPlayerESP
 
+-- Default InvinceTrack OFF if nil
+if _G.InvinceTrack == nil then
+    _G.InvinceTrack = false
+end
+
 -- Drawing line (if executor supports Drawing)
 local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
 if not _G.ClosestLine and hasDrawing and DrawingNew then
@@ -110,10 +115,10 @@ local function isEnemy(player)
 	if not isAlive(player) then return false end
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
 
-	-- Ignore invincible players if Invince Track is on
-	if _G.InvinceTrack == nil then
-    _G.InvinceTrack = false
-end
+	-- Ignore invincible players if Invince Track is ON
+	if _G.InvinceTrack and isPlayerInvincible(player.Character) then
+		return false
+	end
 
 	if isFFA() then
 		return true
