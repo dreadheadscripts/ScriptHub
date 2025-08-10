@@ -6,7 +6,7 @@ local Camera = workspace.CurrentCamera
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
-local MAX_DISTANCE = 700
+local MAX_DISTANCE = 500
 
 local playerTab = _G.Tabs and _G.Tabs.Player
 if not playerTab then
