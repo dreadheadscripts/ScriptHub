@@ -1,27 +1,28 @@
 --// AutoShootButton.lua
---// Services
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Wait for config tab
+local function debugPrint(...)
+    print("[AutoShoot DEBUG]:", ...)
+end
+
 local configTab
 repeat
     configTab = _G.Tabs and _G.Tabs.Config
-    wait(0.1)
+    task.wait(0.1)
 until configTab
 
--- Auto Shoot variables
-local autoShootOn = true  -- STARTED ON
-local shootInterval = 0.1  -- seconds between shots
+local autoShootOn = true
+local shootInterval = 0.1
+local refreshInterval = 60
 
--- Create Auto Shoot toggle button
 local autoShootButton = Instance.new("TextButton")
 autoShootButton.Size = UDim2.new(1, 0, 0, 35)
-autoShootButton.Position = UDim2.new(0, 0, 0, 130) -- adjust Y if needed
-autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- green because ON
+autoShootButton.Position = UDim2.new(0, 0, 0, 130)
+autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
 autoShootButton.TextColor3 = Color3.new(1, 1, 1)
 autoShootButton.Font = Enum.Font.GothamBold
 autoShootButton.TextSize = 18
@@ -29,32 +30,39 @@ autoShootButton.Text = "Auto Shoot: On"
 autoShootButton.Parent = configTab
 Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
 
--- Function to tap directly in center of screen on mobile
+-- Simulate touch tap at center for mobile
 local function doTouchTapCenter()
-    local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    UserInputService:TouchTap(centerPos.X, centerPos.Y)
+    local centerX = Camera.ViewportSize.X / 2
+    local centerY = Camera.ViewportSize.Y / 2
+
+    -- Touch began
+    UserInputService:SendTouchEvent(Enum.UserInputState.Begin, 0, Vector2.new(centerX, centerY), 0)
+    task.wait(0.05)
+    -- Touch ended
+    UserInputService:SendTouchEvent(Enum.UserInputState.End, 0, Vector2.new(centerX, centerY), 0)
+
+    debugPrint("Sent TouchTap at center:", centerX, centerY)
 end
 
--- Function to click mouse center on PC fallback
+-- Mouse click fallback for PC
 local function doMouseClickCenter()
     local vim = game:GetService("VirtualInputManager")
     if vim and vim.SendMouseButtonEvent then
         local centerX = Camera.ViewportSize.X / 2
         local centerY = Camera.ViewportSize.Y / 2
-        -- Mouse button down
         vim:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-        wait(0.01)
-        -- Mouse button up
+        task.wait(0.01)
         vim:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+        debugPrint("Sent MouseClick at center:", centerX, centerY)
     else
-        -- fallback clicks at 0,0 (may not be accurate)
         UserInputService:SendMouseButtonEvent(0, 0, 0, true)
         UserInputService:SendMouseButtonEvent(0, 0, 0, false)
+        debugPrint("Fallback MouseClick at (0,0)")
     end
 end
 
--- Auto shoot loop
 spawn(function()
+    local elapsed = 0
     while true do
         if autoShootOn and _G.CurrentAimbotTarget then
             if UserInputService.TouchEnabled then
@@ -63,13 +71,29 @@ spawn(function()
                 doMouseClickCenter()
             end
         end
-        wait(shootInterval)
+        task.wait(shootInterval)
+        elapsed = elapsed + shootInterval
+        if elapsed >= refreshInterval then
+            debugPrint("Refreshing AutoShootButton.lua script...")
+            elapsed = 0
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AutoShootButton.lua"))()
+            end)
+            if not success then
+                debugPrint("Failed to reload AutoShootButton.lua:", err)
+            else
+                debugPrint("Reloaded AutoShootButton.lua successfully.")
+            end
+            break
+        end
     end
 end)
 
--- Toggle button logic
 autoShootButton.MouseButton1Click:Connect(function()
     autoShootOn = not autoShootOn
     autoShootButton.Text = "Auto Shoot: " .. (autoShootOn and "On" or "Off")
     autoShootButton.BackgroundColor3 = autoShootOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+    debugPrint("Auto Shoot toggled", autoShootOn and "ON" or "OFF")
 end)
+
+debugPrint("AutoShootButton.lua script loaded and running.")
