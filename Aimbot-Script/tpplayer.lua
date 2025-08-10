@@ -37,7 +37,7 @@ local function updateDropdown()
 			local option = Instance.new("TextButton")
 			option.Size = UDim2.new(1, 0, 0, 25)
 			option.Position = UDim2.new(0, 0, 0, y)
-			option.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			option.BackgroundColor3 = Color3.fromRGB(28, 129, 50)
 			option.TextColor3 = Color3.new(1, 1, 1)
 			option.Font = Enum.Font.Gotham
 			option.TextSize = 14
@@ -77,7 +77,7 @@ end)
 local tpButton = Instance.new("TextButton")
 tpButton.Size = UDim2.new(0.45, -5, 0, 35)
 tpButton.Position = UDim2.new(0, 0, 0, 50)
-tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tpButton.BackgroundColor3 = Color3.fromRGB(20, 30, 20)
 tpButton.TextColor3 = Color3.new(1, 1, 1)
 tpButton.Font = Enum.Font.GothamBold
 tpButton.TextSize = 18
