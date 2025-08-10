@@ -1,4 +1,4 @@
--- Esp.lua (with Force FFA toggle & improved handling)
+-- Esp.lua (without Force FFA toggle)
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -19,8 +19,7 @@ local espOn = false
 local espHighlights = {}        -- [player] = Highlight
 local previousClosest = nil
 
--- Manual override for FFA (off by default)
-_G.ForceFFA = (_G.ForceFFA == nil) and false or _G.ForceFFA
+-- _G.ClosestPlayerESP toggle (still exists)
 _G.ClosestPlayerESP = (_G.ClosestPlayerESP == nil) and false or _G.ClosestPlayerESP
 
 -- Drawing line (if executor supports Drawing)
@@ -58,14 +57,10 @@ local function isAlive(player)
 	return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChild("Humanoid").Health > 0
 end
 
--- Improved FFA detection:
--- 1) If _G.ForceFFA == true -> FFA
--- 2) If no team values assigned at all (everyone.Team == nil) -> FFA
--- 3) If everyone (except you) is on the same team as you -> FFA
--- NOTE: This is a heuristic; some games use server-only friendly-fire toggles that can't be read client-side.
+-- Improved FFA detection (no manual override):
+-- 1) If no team values assigned at all (everyone.Team == nil) -> FFA
+-- 2) If everyone (except you) is on the same team as you -> FFA
 local function isFFA()
-	if _G.ForceFFA then return true end
-
 	-- check if any player has a non-nil team assigned
 	local anyTeamAssigned = false
 	for _,p in ipairs(Players:GetPlayers()) do
@@ -137,28 +132,6 @@ espButton.MouseButton1Click:Connect(function()
 	if not espOn then ClearESP() end
 end)
 
--- Force FFA toggle button right under ESP button
-local ffaBtn = Instance.new("TextButton")
-ffaBtn.Size = UDim2.new(0.48, -4, 0, 30) -- left half under esp
-ffaBtn.Position = UDim2.new(0, 0, 0, 50)
-ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
-ffaBtn.Font = Enum.Font.GothamBold
-ffaBtn.TextSize = 16
-ffaBtn.TextColor3 = Color3.new(1,1,1)
-ffaBtn.Parent = playerTab
-Instance.new("UICorner", ffaBtn).CornerRadius = UDim.new(0,6)
-
-ffaBtn.MouseButton1Click:Connect(function()
-	_G.ForceFFA = not _G.ForceFFA
-	ffaBtn.Text = "Force FFA: " .. (_G.ForceFFA and "On" or "Off")
-	ffaBtn.BackgroundColor3 = _G.ForceFFA and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
-	-- resetting highlights is useful so the UI immediately reflects mode change
-	if espOn then
-		ClearESP()
-	end
-end)
-
 -- (Optional) small label on right showing current auto-FFA heuristic result
 local heurLabel = Instance.new("TextLabel")
 heurLabel.Size = UDim2.new(0.48, -4, 0, 30)
@@ -175,8 +148,6 @@ RunService.RenderStepped:Connect(function()
 	heurLabel.Text = isFFA() and "Mode: FFA" or "Mode: Teams"
 
 	if not espOn then
-		-- ensure cleaned up
-		-- (don't ClearESP every tick to avoid GC thrash; only if not already empty)
 		if next(espHighlights) then ClearESP() end
 		return
 	end
@@ -187,7 +158,6 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	-- find closest valid enemy
 	local closestPlayer = nil
 	local closestDist = math.huge
 	local seen = {}
@@ -232,18 +202,14 @@ RunService.RenderStepped:Connect(function()
 
 	-- Handle closest-player coloring + tracking line
 	if _G.ClosestPlayerESP and closestPlayer and espHighlights[closestPlayer] then
-		-- reset previous if changed
 		if previousClosest and previousClosest ~= closestPlayer then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
 			end
 		end
-
-		-- color closest yellow
 		pcall(function() espHighlights[closestPlayer].OutlineColor = Color3.fromRGB(255,255,0) end)
 		previousClosest = closestPlayer
 
-		-- update line
 		if _G.ClosestLine then
 			local hrp = closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart")
 			if hrp then
@@ -257,7 +223,6 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 	else
-		-- not enabled or no closest -> ensure line hidden and reset previous highlight
 		if previousClosest then
 			if espHighlights[previousClosest] and espHighlights[previousClosest].Parent then
 				pcall(function() espHighlights[previousClosest].OutlineColor = Color3.fromRGB(255,0,0) end)
