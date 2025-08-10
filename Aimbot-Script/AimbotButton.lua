@@ -18,7 +18,7 @@ until combatTab
 
 -- Helper functions
 local function isAlive(player)
-    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+    return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0
 end
 
 local function canBeDamaged(player)
@@ -95,10 +95,17 @@ aimbotButton.Parent = combatTab
 Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
 
 -- Aimbot visuals (tracking line)
-local aimbotLine = Drawing.new("Line")
-aimbotLine.Color = Color3.new(0, 1, 0)
-aimbotLine.Thickness = 2
-aimbotLine.Visible = false
+local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
+local aimbotLine = nil
+if hasDrawing and DrawingNew then
+    local ok, line = pcall(DrawingNew, "Line")
+    if ok and line then
+        line.Color = Color3.new(0, 1, 0)
+        line.Thickness = 2
+        line.Visible = false
+        aimbotLine = line
+    end
+end
 
 -- Toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
@@ -108,27 +115,27 @@ aimbotButton.MouseButton1Click:Connect(function()
 
     if not aimbotOn then
         currentAimbotTarget = nil
-        aimbotLine.Visible = false
+        if aimbotLine then aimbotLine.Visible = false end
     end
 end)
 
 -- Main aimbot loop
 RunService.RenderStepped:Connect(function()
     if not aimbotOn then
-        aimbotLine.Visible = false
+        if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         return
     end
 
     if not LocalPlayer.Character or not isAlive(LocalPlayer) then
-        aimbotLine.Visible = false
+        if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         return
     end
 
     local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then
-        aimbotLine.Visible = false
+        if aimbotLine then aimbotLine.Visible = false end
         currentAimbotTarget = nil
         return
     end
@@ -189,11 +196,13 @@ RunService.RenderStepped:Connect(function()
 
     if currentAimbotTarget and closestPart then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
-        local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
-        aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
-        aimbotLine.Visible = screenPos.Z > 0
+        if aimbotLine then
+            local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
+            aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
+            aimbotLine.Visible = screenPos.Z > 0
+        end
     else
-        aimbotLine.Visible = false
+        if aimbotLine then aimbotLine.Visible = false end
     end
 end)
