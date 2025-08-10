@@ -1,10 +1,6 @@
---// AutoShootButton.lua
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- Wait for config tab
 local configTab
@@ -27,25 +23,17 @@ autoShootButton.Text = "Auto Shoot: On"
 autoShootButton.Parent = configTab
 Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
 
-local function doMouseClickCenter()
-    if not VirtualInputManager or not VirtualInputManager.SendMouseButtonEvent then
-        return
-    end
-
-    local centerX = Camera.ViewportSize.X / 2
-    local centerY = Camera.ViewportSize.Y / 2
-
-    -- Mouse button down, unprocessed (doesn't block other inputs)
-    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0, false)
-    task.wait(0.01)
-    -- Mouse button up, unprocessed
-    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0, false)
-end
-
 spawn(function()
     while true do
         if autoShootOn and _G.CurrentAimbotTarget ~= nil then
-            doMouseClickCenter()
+            local character = LocalPlayer.Character
+            if character then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                local tool = humanoid and humanoid:FindFirstChildOfClass("Tool")
+                if tool and tool:FindFirstChild("Handle") then
+                    tool:Activate()
+                end
+            end
         end
         task.wait(shootInterval)
     end
