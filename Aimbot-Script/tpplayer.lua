@@ -8,7 +8,7 @@ local selectedPlayer = nil
 -- Dropdown menu (right side)
 local dropdown = Instance.new("TextButton")
 dropdown.Size = UDim2.new(0.55, 0, 0, 35)
-dropdown.Position = UDim2.new(0.45, 0, 0, 55)
+dropdown.Position = UDim2.new(0.45, 0, 0, 50)
 dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 dropdown.TextColor3 = Color3.new(1, 1, 1)
 dropdown.Font = Enum.Font.Gotham
@@ -76,7 +76,7 @@ end)
 -- TP Button (left side)
 local tpButton = Instance.new("TextButton")
 tpButton.Size = UDim2.new(0.45, -5, 0, 35)
-tpButton.Position = UDim2.new(0, 0, 0, 55)
+tpButton.Position = UDim2.new(0, 0, 0, 50)
 tpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 tpButton.TextColor3 = Color3.new(1, 1, 1)
 tpButton.Font = Enum.Font.GothamBold
