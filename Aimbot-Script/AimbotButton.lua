@@ -50,7 +50,14 @@ local function isEnemy(player)
         return false
     end
     if not canBeDamaged(player) then return false end
-    if hasSpawnProtection(player) then return false end
+
+    -- If InvinceTrack toggle OFF, skip invincible players
+    if not _G.InvinceTrack then
+        if hasSpawnProtection(player) then
+            return false
+        end
+    end
+
     return true
 end
 
@@ -131,19 +138,45 @@ RunService.RenderStepped:Connect(function()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and isEnemy(player) then
             local char = player.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
-                if distToPlayer <= MAX_DISTANCE then
-                    local head = char:FindFirstChild("Head")
-                    if head and isVisible(head.Position, char) then
-                        if hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local head = char:FindFirstChild("Head")
+
+                if hrp then
+                    local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
+                    if distToPlayer <= MAX_DISTANCE then
+                        -- Try torso first
+                        if isVisible(hrp.Position, char) and hasLineOfSight(Camera.CFrame.Position, hrp.Position, {LocalPlayer.Character, char}) then
+                            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                            if fov < AIMBOT_FOV and fov < bestVal then
+                                closestPlayer = player
+                                closestPart = hrp
+                                bestVal = fov
+                            end
+                        elseif head and isVisible(head.Position, char) and hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
+                            -- If torso not visible, track head if visible
                             local screenPos = Camera:WorldToViewportPoint(head.Position)
                             local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
                             if fov < AIMBOT_FOV and fov < bestVal then
                                 closestPlayer = player
                                 closestPart = head
                                 bestVal = fov
+                            end
+                        else
+                            -- If neither torso nor head visible, try any other part
+                            for _, part in ipairs(char:GetChildren()) do
+                                if part:IsA("BasePart") and part ~= hrp and part ~= head then
+                                    if isVisible(part.Position, char) and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character, char}) then
+                                        local screenPos = Camera:WorldToViewportPoint(part.Position)
+                                        local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                                        if fov < AIMBOT_FOV and fov < bestVal then
+                                            closestPlayer = player
+                                            closestPart = part
+                                            bestVal = fov
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
