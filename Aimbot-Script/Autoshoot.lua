@@ -32,16 +32,18 @@ end)
 
 -- Create Auto Shoot toggle button
 local autoShootButton = Instance.new("TextButton")
-autoShootButton.Size = UDim2.new(1, 0, 0, 35)
+autoShootButton.Size = UDim2.new(1, 0, 0, 50) -- taller to fit note
 autoShootButton.Position = UDim2.new(0, 0, 0, 130)
 autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- green ON
 autoShootButton.TextColor3 = Color3.new(1, 1, 1)
 autoShootButton.Font = Enum.Font.GothamBold
-autoShootButton.TextSize = 18
-autoShootButton.Text = "Auto Shoot: On"
+autoShootButton.TextSize = 16
+autoShootButton.TextWrapped = true
+autoShootButton.Text = "Auto Shoot: On\n(works better on PC)"
 autoShootButton.Parent = configTab
 Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
 
+-- Function to simulate mouse click at center of screen
 local function doMouseClickCenter()
     local vim = game:GetService("VirtualInputManager")
     if vim and vim.SendMouseButtonEvent then
@@ -70,6 +72,6 @@ end)
 -- Toggle button logic
 autoShootButton.MouseButton1Click:Connect(function()
     autoShootOn = not autoShootOn
-    autoShootButton.Text = "Auto Shoot: " .. (autoShootOn and "On" or "Off")
+    autoShootButton.Text = "Auto Shoot: " .. (autoShootOn and "On" or "Off") .. "\n(works better on PC)"
     autoShootButton.BackgroundColor3 = autoShootOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 end)
