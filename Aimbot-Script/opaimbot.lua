@@ -100,7 +100,7 @@ opButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 opButton.TextColor3 = Color3.new(1, 1, 1)
 opButton.Font = Enum.Font.GothamBold
 opButton.TextSize = 18
-opButton.Text = "OP Aimbot: Off"
+opButton.Text = "Aimbot: Off"
 opButton.Parent = combatTab
 Instance.new("UICorner", opButton).CornerRadius = UDim.new(0, 6)
 
@@ -134,7 +134,7 @@ end
 -- Toggle OP Aimbot on/off
 opButton.MouseButton1Click:Connect(function()
     opOn = not opOn
-    opButton.Text = "OP Aimbot: " .. (opOn and "On" or "Off")
+    opButton.Text = "Aimbot: " .. (opOn and "On" or "Off")
     opButton.BackgroundColor3 = opOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 
     if not opOn then
