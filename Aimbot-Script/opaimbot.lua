@@ -5,8 +5,7 @@ local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-local MAX_DISTANCE = 500
-local AIMBOT_FOV = 300
+local MAX_DISTANCE = 500 -- max distance to target
 
 -- Wait for combat tab to exist
 local combatTab
@@ -53,7 +52,6 @@ local function isEnemy(player)
     end
     if not canBeDamaged(player) then return false end
 
-    -- If InvinceTrack toggle OFF, skip invincible players
     if not _G.InvinceTrack then
         if hasSpawnProtection(player) then
             return false
@@ -134,6 +132,15 @@ aimbotButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Calculate angular distance between camera and target
+local function getAngularDistance(worldPos)
+    local camPos = Camera.CFrame.Position
+    local camLook = Camera.CFrame.LookVector
+    local dir = (worldPos - camPos).Unit
+    local angle = math.acos(math.clamp(camLook:Dot(dir), -1, 1))
+    return math.deg(angle)
+end
+
 -- Main aimbot loop
 RunService.RenderStepped:Connect(function()
     if not aimbotOn then
@@ -161,48 +168,23 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    local closestPlayer, closestPart, bestVal = nil, nil, math.huge
+    local closestPlayer, closestPart
+    local bestVal = math.huge -- start infinite for 3D tracking
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and isEnemy(player) then
             local char = player.Character
             if char then
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
                 local humanoid = char:FindFirstChildOfClass("Humanoid")
-
-                if hrp and humanoid and humanoid.Health > 0 then
-                    local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
-                    if distToPlayer <= MAX_DISTANCE then
-                        -- Prioritize HEAD over TORSO
-                        if head and isVisible(head.Position, char) and hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
-                            local screenPos = Camera:WorldToViewportPoint(head.Position)
-                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                            if fov < AIMBOT_FOV and fov < bestVal then
-                                closestPlayer = player
-                                closestPart = head
-                                bestVal = fov
-                            end
-                        elseif isVisible(hrp.Position, char) and hasLineOfSight(Camera.CFrame.Position, hrp.Position, {LocalPlayer.Character, char}) then
-                            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
-                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                            if fov < AIMBOT_FOV and fov < bestVal then
-                                closestPlayer = player
-                                closestPart = hrp
-                                bestVal = fov
-                            end
-                        else
-                            for _, part in ipairs(char:GetChildren()) do
-                                if part:IsA("BasePart") and part ~= hrp and part ~= head then
-                                    if isVisible(part.Position, char) and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character, char}) then
-                                        local screenPos = Camera:WorldToViewportPoint(part.Position)
-                                        local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                                        if fov < AIMBOT_FOV and fov < bestVal then
-                                            closestPlayer = player
-                                            closestPart = part
-                                            bestVal = fov
-                                        end
-                                    end
+                if humanoid and humanoid.Health > 0 then
+                    for _, part in ipairs(char:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            if isVisible(part.Position, char) and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character, char}) then
+                                local dist = (part.Position - myHRP.Position).Magnitude
+                                if dist < bestVal and dist <= MAX_DISTANCE then
+                                    closestPlayer = player
+                                    closestPart = part
+                                    bestVal = dist
                                 end
                             end
                         end
@@ -212,7 +194,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- If target changed, disconnect previous death event
+    -- Handle target change
     if currentAimbotTarget ~= closestPlayer then
         cleanupDeathConnection()
         currentAimbotTarget = closestPlayer
@@ -234,6 +216,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Lock camera
     if currentAimbotTarget and closestPart then
         Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
         if aimbotLine then
