@@ -1,31 +1,26 @@
---// OP Aimbot (3D tracking with max distance 500, snap aim) - place under Combat tab
+--// AimbotButton.lua
 --// Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Settings
-local MAX_DISTANCE = 500        -- maximum tracking distance
-local SMOOTHING = 0             -- 0 = snap instantly (no smoothing)
-local TARGET_PREFERENCE = { "Head", "HumanoidRootPart" } -- preference order (head first)
+local MAX_DISTANCE = 500
+local AIMBOT_FOV = 300
 
 -- Wait for combat tab to exist
 local combatTab
 repeat
     combatTab = _G.Tabs and _G.Tabs.Combat
-    task.wait(0.1)
+    wait(0.1)
 until combatTab
 
--- Ensure global aimbot target exists
-_G.CurrentAimbotTarget = _G.CurrentAimbotTarget or nil
+-- Initialize global tracking variable
+_G.CurrentAimbotTarget = nil
 
 -- Helper functions
 local function isAlive(player)
-    return player 
-       and player.Character 
-       and player.Character:FindFirstChildOfClass("Humanoid") 
-       and player.Character.Humanoid.Health > 0
+    return player and player.Character and player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.Health > 0
 end
 
 local function canBeDamaged(player)
@@ -39,147 +34,176 @@ end
 local function hasSpawnProtection(player)
     local char = player.Character
     if not char then return false end
-    if char:FindFirstChildOfClass("ForceField") then return true end
-    if char:FindFirstChild("ForceField") then return true end
-    local spawnProt = char:FindFirstChild("SpawnProtection") or char:FindFirstChild("Invincible")
-    if spawnProt and spawnProt.Value == true then return true end
-    return false
+    return char:FindFirstChildOfClass("ForceField") ~= nil
 end
 
 local function isVisible(position, character)
     local origin = Camera.CFrame.Position
-    local dir = (position - origin)
-    if dir.Magnitude == 0 then return true end
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = { LocalPlayer.Character }
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.IgnoreWater = true
-    local result = workspace:Raycast(origin, dir, rayParams)
-    if not result then
-        return true
-    end
-    local hit = result.Instance
-    if hit and character and hit:IsDescendantOf(character) then
-        return true
-    end
-    return false
+    local ray = workspace:Raycast(origin, (position - origin).Unit * 9999, rayParams)
+    return ray and character:IsAncestorOf(ray.Instance) or not ray
 end
 
 local function isEnemy(player)
-    if player == LocalPlayer then return false end
-    if not isAlive(player) then return false end
-    if not player.Character then return false end
+    if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+        return false
+    end
     if not canBeDamaged(player) then return false end
-    if (_G.InvinceTrack == nil or _G.InvinceTrack == false) and hasSpawnProtection(player) then
+
+    -- If InvinceTrack toggle OFF, skip invincible players
+    if not _G.InvinceTrack then
+        if hasSpawnProtection(player) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function hasLineOfSight(fromPos, toPos, ignoreList)
+    local direction = (toPos - fromPos)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = ignoreList or {}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.IgnoreWater = true
+    local raycastResult = workspace:Raycast(fromPos, direction, rayParams)
+    if raycastResult then
+        local hitPart = raycastResult.Instance
+        if hitPart and hitPart:IsDescendantOf(Players:GetPlayerFromCharacter(hitPart.Parent) and hitPart.Parent or nil) then
+            return true
+        end
         return false
     end
     return true
 end
 
-local function getPreferredTargetPart(char)
-    if not char then return nil end
-    for _, name in ipairs(TARGET_PREFERENCE) do
-        local p = char:FindFirstChild(name)
-        if p and p:IsA("BasePart") then
-            return p
-        end
-    end
-    for _, obj in ipairs(char:GetChildren()) do
-        if obj:IsA("BasePart") then
-            return obj
-        end
-    end
-    return nil
-end
-
--- Create OP Aimbot button (under aimbot button at Y=10, so this is Y=55)
-local opButton = Instance.new("TextButton")
-opButton.Size = UDim2.new(1, 0, 0, 35)
-opButton.Position = UDim2.new(0, 0, 0, 50)
-opButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-opButton.TextColor3 = Color3.new(1, 1, 1)
-opButton.Font = Enum.Font.GothamBold
-opButton.TextSize = 18
-opButton.Text = "Aimbot: Off"
-opButton.Parent = combatTab
-Instance.new("UICorner", opButton).CornerRadius = UDim.new(0, 6)
-
--- Optional Drawing line for target tracking
-local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
-local trackLine = nil
-if hasDrawing and DrawingNew then
-    local ok, ln = pcall(DrawingNew, "Line")
-    if ok and ln then
-        ln.Color = Color3.new(0, 1, 0)
-        ln.Thickness = 2
-        ln.Visible = false
-        trackLine = ln
-    end
-end
-
--- State
-local opOn = false
-local currentTarget = nil
-local targetHumanoid = nil
+-- Aimbot variables
+local aimbotOn = false
+local currentAimbotTarget = nil
+local currentTargetHumanoid = nil
 local deathConn = nil
 
-local function cleanupDeathConn()
-    if deathConn then
-        pcall(function() deathConn:Disconnect() end)
-        deathConn = nil
-        targetHumanoid = nil
+-- Create Aimbot toggle button
+local aimbotButton = Instance.new("TextButton")
+aimbotButton.Size = UDim2.new(1, 0, 0, 35)
+aimbotButton.Position = UDim2.new(0, 0, 0, 10)
+aimbotButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+aimbotButton.TextColor3 = Color3.new(1, 1, 1)
+aimbotButton.Font = Enum.Font.GothamBold
+aimbotButton.TextSize = 18
+aimbotButton.Text = "Op Aimbot: Off"
+aimbotButton.Parent = combatTab
+Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
+
+-- Aimbot visuals (tracking line)
+local hasDrawing, DrawingNew = pcall(function() return Drawing.new end)
+local aimbotLine = nil
+if hasDrawing and DrawingNew then
+    local ok, line = pcall(DrawingNew, "Line")
+    if ok and line then
+        line.Color = Color3.new(0, 1, 0)
+        line.Thickness = 2
+        line.Visible = false
+        aimbotLine = line
     end
 end
 
--- Toggle OP Aimbot on/off
-opButton.MouseButton1Click:Connect(function()
-    opOn = not opOn
-    opButton.Text = "Aimbot: " .. (opOn and "On" or "Off")
-    opButton.BackgroundColor3 = opOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+-- Cleanup function for aimbot target death connection
+local function cleanupDeathConnection()
+    if deathConn then
+        deathConn:Disconnect()
+        deathConn = nil
+        currentTargetHumanoid = nil
+    end
+end
 
-    if not opOn then
-        currentTarget = nil
+-- Toggle logic
+aimbotButton.MouseButton1Click:Connect(function()
+    aimbotOn = not aimbotOn
+    aimbotButton.Text = "Op Aimbot: " .. (aimbotOn and "On" or "Off")
+    aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+
+    if not aimbotOn then
+        currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
-        cleanupDeathConn()
-        if trackLine then trackLine.Visible = false end
+        cleanupDeathConnection()
+        if aimbotLine then aimbotLine.Visible = false end
     end
 end)
 
--- Main loop: find closest enemy and snap aim instantly in 3D space
+-- Main aimbot loop
 RunService.RenderStepped:Connect(function()
-    if not opOn then
-        if trackLine then trackLine.Visible = false end
+    if not aimbotOn then
+        if aimbotLine then aimbotLine.Visible = false end
+        currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         return
     end
 
     if not LocalPlayer.Character or not isAlive(LocalPlayer) then
-        if trackLine then trackLine.Visible = false end
-        currentTarget = nil
+        if aimbotLine then aimbotLine.Visible = false end
+        currentAimbotTarget = nil
         _G.CurrentAimbotTarget = nil
-        cleanupDeathConn()
+        cleanupDeathConnection()
         return
     end
 
     local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then
-        if trackLine then trackLine.Visible = false end
+        if aimbotLine then aimbotLine.Visible = false end
+        currentAimbotTarget = nil
+        _G.CurrentAimbotTarget = nil
+        cleanupDeathConnection()
         return
     end
 
-    local bestPlayer, bestPart, bestDist = nil, nil, math.huge
+    local closestPlayer, closestPart, bestVal = nil, nil, math.huge
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and isEnemy(player) then
             local char = player.Character
             if char then
-                local part = getPreferredTargetPart(char)
-                if part and part.Position then
-                    local dist = (part.Position - myHRP.Position).Magnitude
-                    if dist <= MAX_DISTANCE then
-                        if isVisible(part.Position, char) then
-                            if dist < bestDist then
-                                bestDist = dist
-                                bestPlayer = player
-                                bestPart = part
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local head = char:FindFirstChild("Head")
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+                if hrp and humanoid and humanoid.Health > 0 then
+                    local distToPlayer = (hrp.Position - myHRP.Position).Magnitude
+                    if distToPlayer <= MAX_DISTANCE then
+                        -- Prioritize HEAD over TORSO
+                        if head and isVisible(head.Position, char) and hasLineOfSight(Camera.CFrame.Position, head.Position, {LocalPlayer.Character, char}) then
+                            local screenPos = Camera:WorldToViewportPoint(head.Position)
+                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                            if fov < AIMBOT_FOV and fov < bestVal then
+                                closestPlayer = player
+                                closestPart = head
+                                bestVal = fov
+                            end
+                        elseif isVisible(hrp.Position, char) and hasLineOfSight(Camera.CFrame.Position, hrp.Position, {LocalPlayer.Character, char}) then
+                            local screenPos = Camera:WorldToViewportPoint(hrp.Position)
+                            local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                            if fov < AIMBOT_FOV and fov < bestVal then
+                                closestPlayer = player
+                                closestPart = hrp
+                                bestVal = fov
+                            end
+                        else
+                            for _, part in ipairs(char:GetChildren()) do
+                                if part:IsA("BasePart") and part ~= hrp and part ~= head then
+                                    if isVisible(part.Position, char) and hasLineOfSight(Camera.CFrame.Position, part.Position, {LocalPlayer.Character, char}) then
+                                        local screenPos = Camera:WorldToViewportPoint(part.Position)
+                                        local fov = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+                                        if fov < AIMBOT_FOV and fov < bestVal then
+                                            closestPlayer = player
+                                            closestPart = part
+                                            bestVal = fov
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
@@ -188,52 +212,37 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if currentTarget ~= bestPlayer then
-        cleanupDeathConn()
-        currentTarget = bestPlayer
-        _G.CurrentAimbotTarget = currentTarget
-        if currentTarget then
-            local ch = currentTarget.Character
-            if ch then
-                targetHumanoid = ch:FindFirstChildOfClass("Humanoid")
-                if targetHumanoid then
-                    deathConn = targetHumanoid.Died:Connect(function()
-                        currentTarget = nil
+    -- If target changed, disconnect previous death event
+    if currentAimbotTarget ~= closestPlayer then
+        cleanupDeathConnection()
+        currentAimbotTarget = closestPlayer
+        _G.CurrentAimbotTarget = currentAimbotTarget
+
+        if currentAimbotTarget then
+            local char = currentAimbotTarget.Character
+            if char then
+                currentTargetHumanoid = char:FindFirstChildOfClass("Humanoid")
+                if currentTargetHumanoid then
+                    deathConn = currentTargetHumanoid.Died:Connect(function()
+                        currentAimbotTarget = nil
                         _G.CurrentAimbotTarget = nil
-                        cleanupDeathConn()
-                        if trackLine then trackLine.Visible = false end
+                        cleanupDeathConnection()
+                        if aimbotLine then aimbotLine.Visible = false end
                     end)
                 end
             end
         end
     end
 
-    if currentTarget and bestPart and bestPart.Parent then
-        local targetPos = bestPart.Position
-        local desired = CFrame.new(Camera.CFrame.Position, targetPos)
-        -- Instant snap (no lerp)
-        Camera.CFrame = desired
-        if trackLine then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
-            trackLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-            trackLine.To = Vector2.new(screenPos.X, screenPos.Y)
-            trackLine.Visible = onScreen
+    if currentAimbotTarget and closestPart then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestPart.Position)
+        if aimbotLine then
+            local screenPos = Camera:WorldToViewportPoint(closestPart.Position)
+            aimbotLine.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            aimbotLine.To = Vector2.new(screenPos.X, screenPos.Y)
+            aimbotLine.Visible = screenPos.Z > 0
         end
     else
-        if trackLine then trackLine.Visible = false end
+        if aimbotLine then aimbotLine.Visible = false end
     end
-end)
-
--- Clean up global target on player leaving or respawn
-Players.PlayerRemoving:Connect(function(p)
-    if _G.CurrentAimbotTarget == p then
-        _G.CurrentAimbotTarget = nil
-    end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    currentTarget = nil
-    _G.CurrentAimbotTarget = nil
-    cleanupDeathConn()
-    if trackLine then trackLine.Visible = false end
 end)
