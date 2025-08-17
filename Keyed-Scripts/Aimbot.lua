@@ -25,8 +25,7 @@ local FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/smh-keysyst
 local HEARTBEAT_INTERVAL = 2
 local STALE_THRESHOLD = 15 * 1000 -- milliseconds
 local MainScript = [[
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Base-Gui.lua
-"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Base-Gui.lua"))()
 ]]
 
 --// Utilities
