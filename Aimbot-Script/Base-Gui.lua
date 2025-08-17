@@ -242,11 +242,13 @@ for name, frame in pairs(tabs) do
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
-	label.Text = name .. " Settings go here"
+	label.Text = "More buttons on 08/30/2025"
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Font = Enum.Font.Gotham
 	label.TextSize = 18
 	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.Parent = frame
 end
 
@@ -299,87 +301,11 @@ closeButton.MouseButton1Click:Connect(function()
 end)
 
 -- Load the external scripts AFTER _G.Tabs exists so they can add UI in the right tab
-
--- Load the AimbotButton script into the Combat tab
-local loadSuccess, loadError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))()
-end)
-if not loadSuccess then
-    warn("Failed to load AimbotButton.lua:", loadError)
-else
-    print("✅ AimbotButton.lua loaded and added to Combat tab.")
-end
-
--- Load the Crosshair script
-local crosshairSuccess, crosshairError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Crosshair.lua"))()
-end)
-if not crosshairSuccess then
-    warn("Failed to load Crosshair.lua:", crosshairError)
-else
-    print("✅ Crosshair.lua loaded successfully.")
-end
-
--- Load the ESP script into the Player tab
-local espSuccess, espError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Esp.lua"))()
-end)
-if not espSuccess then
-    warn("Failed to load ESP.lua:", espError)
-else
-    print("✅ ESP.lua loaded and button should appear in Player tab.")
-end
-
--- Load the Closest Player script into the Config tab
-local closestPlayerSuccess, closestPlayerError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/ClosestPlayer.lua"))()
-end)
-if not closestPlayerSuccess then
-    warn("Failed to load ClosestPlayer.lua:", closestPlayerError)
-else
-    print("✅ ClosestPlayer.lua loaded and button should appear in Config tab.")
-end
-
--- Load the TP Player script into the Player tab
-local tpPlayerSuccess, tpPlayerError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/tpplayer.lua"))()
-end)
-
-if not tpPlayerSuccess then
-    warn("Failed to load tpplayer.lua:", tpPlayerError)
-else
-    print("✅ TP Player loaded and button should appear in Player tab.")
-end
-
--- Load the InvinceTrack script into the Config tab
-local invinceTrackSuccess, invinceTrackError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Invincetrack.lua"))()
-end)
-
-if not invinceTrackSuccess then
-    warn("Failed to load Invincetrack.lua:", invinceTrackError)
-else
-    print("✅ Invincetrack.lua loaded and button should appear in Config tab.")
-end
-
--- Load the AutoShoot script into the Config tab
-local autoShootSuccess, autoShootError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Autoshoot.lua"))()
-end)
-
-if not autoShootSuccess then
-    warn("Failed to load Autoshoot.lua:", autoShootError)
-else
-    print("✅ Autoshoot.lua loaded and button added to Config tab.")
-end
-
--- Load the op aimbot script into the Combat tab
-local onaimbotSuccess, onaimbotError = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/opaimbot.lua"))()
-end)
-
-if not onaimbotSuccess then
-    warn("Failed to load onaimbot.lua:", autoShootError)
-else
-    print("✅ onaimbot.lua loaded and button added to Combat tab.")
-end
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/AimbotButton.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Crosshair.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Esp.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/ClosestPlayer.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/tpplayer.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Invincetrack.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/Autoshoot.lua"))() end)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/Aimbot-Script/opaimbot.lua"))() end)
