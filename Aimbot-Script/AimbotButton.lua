@@ -94,7 +94,7 @@ aimbotButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 aimbotButton.TextColor3 = Color3.new(1, 1, 1)
 aimbotButton.Font = Enum.Font.GothamBold
 aimbotButton.TextSize = 18
-aimbotButton.Text = "Op Aimbot: Off"
+aimbotButton.Text = "Aimbot: Off"
 aimbotButton.Parent = combatTab
 Instance.new("UICorner", aimbotButton).CornerRadius = UDim.new(0, 6)
 
@@ -123,7 +123,7 @@ end
 -- Toggle logic
 aimbotButton.MouseButton1Click:Connect(function()
     aimbotOn = not aimbotOn
-    aimbotButton.Text = "Op Aimbot: " .. (aimbotOn and "On" or "Off")
+    aimbotButton.Text = "Aimbot: " .. (aimbotOn and "On" or "Off")
     aimbotButton.BackgroundColor3 = aimbotOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
 
     if not aimbotOn then
