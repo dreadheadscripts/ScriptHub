@@ -24,9 +24,21 @@ local keyFileName = "keySystemKey.txt"
 local FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/smh-keysystem/databases/(default)/documents/keys/"
 local HEARTBEAT_INTERVAL = 2
 local STALE_THRESHOLD = 15 * 1000 -- milliseconds
+
+
+
+--//   M       M     AAAAA     III    N     N        SSSS     CCCCC     RRRR     III    PPPP    TTTTT
+--//   MM     MM    A     A     I     NN    N       S        C         R   R     I     P   P      T  
+--//   M M   M M    AAAAAAA     I     N N   N        SSS     C         RRRR      I     PPPP       T  
+--//   M  M M  M    A     A     I     N  N  N           S    C         R  R      I     P          T  
+--//   M   M   M    A     A    III    N   N N       SSSS     CCCCC     R   R    III    P          T  
+--//  🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻🔻
 local MainScript = [[
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/refs/heads/main/Aimbot-Script/Base-Gui.lua"))()
 ]]
+--//  🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺🔺
+
+
 
 --// Utilities
 local function safeReadFile(name)
