@@ -1,8 +1,9 @@
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
 
 -- Wait for config tab
 local configTab
@@ -11,67 +12,80 @@ repeat
     task.wait(0.1)
 until configTab
 
--- Auto Shoot variables
-local autoShootOn = true  -- started ON
-local shootInterval = 0.1  -- seconds between shots
+-- SETTINGS
+local autoShootOn = true
+local shootInterval = 0.08 -- faster & smoother
+local maxDistance = 12 -- only shoot if close
 
--- Track if finger is currently touching the screen (mobile)
 local isTouching = false
 
-UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
-    if not gameProcessed then
+-- Mobile touch detection
+UserInputService.TouchStarted:Connect(function(_, gp)
+    if not gp then
         isTouching = true
     end
 end)
 
-UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-    if not gameProcessed then
+UserInputService.TouchEnded:Connect(function(_, gp)
+    if not gp then
         isTouching = false
     end
 end)
 
--- Create Auto Shoot toggle button
-local autoShootButton = Instance.new("TextButton")
-autoShootButton.Size = UDim2.new(1, 0, 0, 50) -- taller to fit note
-autoShootButton.Position = UDim2.new(0, 0, 0, 130)
-autoShootButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0) -- green ON
-autoShootButton.TextColor3 = Color3.new(1, 1, 1)
-autoShootButton.Font = Enum.Font.GothamBold
-autoShootButton.TextSize = 16
-autoShootButton.TextWrapped = true
-autoShootButton.Text = "Auto Shoot: On\n(works better on PC)"
-autoShootButton.Parent = configTab
-Instance.new("UICorner", autoShootButton).CornerRadius = UDim.new(0, 6)
+-- GUI BUTTON
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, 0, 0, 50)
+btn.Position = UDim2.new(0, 0, 0, 130)
+btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+btn.TextColor3 = Color3.new(1,1,1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 16
+btn.TextWrapped = true
+btn.Text = "Auto Shoot: ON\n(PC recommended)"
+btn.Parent = configTab
 
--- Function to simulate mouse click at center of screen
-local function doMouseClickCenter()
-    local vim = game:GetService("VirtualInputManager")
-    if vim and vim.SendMouseButtonEvent then
-        local centerX = Camera.ViewportSize.X / 2
-        local centerY = Camera.ViewportSize.Y / 2
-        vim:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-        task.wait(0.01)
-        vim:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-    else
-        -- fallback for PC or unknown devices
-        UserInputService:SendMouseButtonEvent(0, 0, 0, true)
-        UserInputService:SendMouseButtonEvent(0, 0, 0, false)
-    end
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+-- CLICK FUNCTION
+local function click()
+    local x = Camera.ViewportSize.X / 2
+    local y = Camera.ViewportSize.Y / 2
+
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.01)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
 end
 
--- Auto shoot loop
+-- MAIN LOOP
 task.spawn(function()
     while true do
-        if autoShootOn and _G.CurrentAimbotTarget and not isTouching then
-            doMouseClickCenter()
+        if autoShootOn and not isTouching then
+            local target = _G.CurrentAimbotTarget
+            local myChar = LocalPlayer.Character
+
+            if target and target.Character and myChar then
+                local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                local mHRP = myChar:FindFirstChild("HumanoidRootPart")
+                local humanoid = target.Character:FindFirstChild("Humanoid")
+
+                if tHRP and mHRP and humanoid and humanoid.Health > 0 then
+                    local dist = (tHRP.Position - mHRP.Position).Magnitude
+
+                    if dist <= maxDistance then
+                        click()
+                    end
+                end
+            end
         end
+
         task.wait(shootInterval)
     end
 end)
 
--- Toggle button logic
-autoShootButton.MouseButton1Click:Connect(function()
+-- TOGGLE BUTTON
+btn.MouseButton1Click:Connect(function()
     autoShootOn = not autoShootOn
-    autoShootButton.Text = "Auto Shoot: " .. (autoShootOn and "On" or "Off") .. "\n(works better on PC)"
-    autoShootButton.BackgroundColor3 = autoShootOn and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(40, 40, 40)
+
+    btn.Text = "Auto Shoot: " .. (autoShootOn and "ON" or "OFF") .. "\n(PC recommended)"
+    btn.BackgroundColor3 = autoShootOn and Color3.fromRGB(0,180,0) or Color3.fromRGB(40,40,40)
 end)
