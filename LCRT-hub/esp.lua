@@ -1,31 +1,44 @@
--- wait until UI is ready
-repeat task.wait() until _G.LucritHub
+repeat task.wait() until _G.Tabs
+repeat task.wait() until _G.Tabs["Combat"]
 
-repeat task.wait() until _G.LucritHub and _G.LucritHub.AddButton
+local Players = game:GetService("Players")
 
-print("ESP module loaded") -- debug
+local function createESP(player)
+	if player == Players.LocalPlayer then return end
 
-_G.LucritHub.AddButton("Combat", "ESP", function()
-	print("ESP CLICKED")
+	local function onCharacter(char)
+		local head = char:WaitForChild("Head", 5)
+		if not head then return end
 
-	for _, player in pairs(game.Players:GetPlayers()) do
-		if player ~= game.Players.LocalPlayer then
-			if player.Character and player.Character:FindFirstChild("Head") then
-				
-				local esp = Instance.new("BillboardGui")
-				esp.Size = UDim2.new(0, 100, 0, 40)
-				esp.AlwaysOnTop = true
-				esp.Adornee = player.Character.Head
-				esp.Parent = player.Character
+		-- avoid duplicates
+		if head:FindFirstChild("ESP") then return end
 
-				local text = Instance.new("TextLabel")
-				text.Size = UDim2.new(1,0,1,0)
-				text.BackgroundTransparency = 1
-				text.Text = player.Name
-				text.TextColor3 = Color3.fromRGB(0,255,200)
-				text.TextScaled = true
-				text.Parent = esp
-			end
-		end
+		local esp = Instance.new("BillboardGui")
+		esp.Name = "ESP"
+		esp.Size = UDim2.new(0, 100, 0, 40)
+		esp.AlwaysOnTop = true
+		esp.Adornee = head
+		esp.Parent = head
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, 0, 1, 0)
+		label.BackgroundTransparency = 1
+		label.Text = player.Name
+		label.TextColor3 = Color3.fromRGB(0, 255, 200)
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBold
+		label.Parent = esp
 	end
-end)
+
+	if player.Character then
+		onCharacter(player.Character)
+	end
+
+	player.CharacterAdded:Connect(onCharacter)
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+	createESP(p)
+end
+
+Players.PlayerAdded:Connect(createESP)
