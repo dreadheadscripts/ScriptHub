@@ -433,6 +433,4 @@ createTab("Combat")
 createTab("Player")
 createTab("mega mansion tycoon thirty 8") 
 
-addButton("Combat", "ESP", function()
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp"))()
-end)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
