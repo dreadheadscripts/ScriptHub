@@ -441,4 +441,7 @@ _G.Tabs = {
     ["mega mansion tycoon thirty 8"] = Tabs["mega mansion tycoon thirty 8"]
 }
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
+task.spawn(function()
+	task.wait(0.5)
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
+end)
