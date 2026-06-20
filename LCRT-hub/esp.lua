@@ -1,13 +1,13 @@
 -- wait until UI is ready
 repeat task.wait() until _G.LucritHub
 
-local hub = _G.LucritHub
+repeat task.wait() until _G.LucritHub and _G.LucritHub.AddButton
 
--- add button to Combat tab
-hub.AddButton("Combat", "ESP", function()
-	print("ESP Activated")
+print("ESP module loaded") -- debug
 
-	-- your ESP code goes here
+_G.LucritHub.AddButton("Combat", "ESP", function()
+	print("ESP CLICKED")
+
 	for _, player in pairs(game.Players:GetPlayers()) do
 		if player ~= game.Players.LocalPlayer then
 			if player.Character and player.Character:FindFirstChild("Head") then
@@ -23,7 +23,6 @@ hub.AddButton("Combat", "ESP", function()
 				text.BackgroundTransparency = 1
 				text.Text = player.Name
 				text.TextColor3 = Color3.fromRGB(0,255,200)
-				text.Font = Enum.Font.GothamBold
 				text.TextScaled = true
 				text.Parent = esp
 			end
