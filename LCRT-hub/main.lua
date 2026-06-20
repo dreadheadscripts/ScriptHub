@@ -429,8 +429,16 @@ task.spawn(function()
 end)
 
 --// TABS
+--// TABS
 createTab("Combat")
 createTab("Player")
-createTab("mega mansion tycoon thirty 8") 
+createTab("mega mansion tycoon thirty 8")
+
+--🔥 ADD THIS
+_G.Tabs = {
+    Combat = Tabs["Combat"],
+    Player = Tabs["Player"],
+    ["mega mansion tycoon thirty 8"] = Tabs["mega mansion tycoon thirty 8"]
+}
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
