@@ -32,7 +32,7 @@ Instance.new("UICorner", b).CornerRadius = UDim.new(0, 20)
 
 --// GLOW BORDER
 local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
+stroke.Thickness = 3.5
 stroke.Color = Color3.fromRGB(120, 80, 255)
 stroke.Transparency = 0.2
 stroke.Parent = main
