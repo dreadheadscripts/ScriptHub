@@ -1,230 +1,394 @@
--- LocalScriptExplorer v1.1 - Complete Fixed Tool
+-- LocalScriptExplorer v3 SAFE + LESS LAGGY
 
--- Setup
 local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local currentSearchQuery = ""
-local currentInventoryItems = {}
-local currentSelectedItem = nil
-local inventoryMode = "items"
+local currentMode = "scripts"
+local filterMode = "all"
 
--- UI Helper
+local cachedResults = {}
+local refreshing = false
+local searchDebounce = false
+local MAX_ROWS = 300
+
 local function makeDraggable(frame)
-	local dragging, dragStart, startPos
+	local dragging = false
+	local dragStart, startPos
+
 	frame.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			dragging = true
 			dragStart = input.Position
 			startPos = frame.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then dragging = false end
-			end)
 		end
 	end)
-	frame.InputChanged:Connect(function(input)
+
+	UIS.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+
+	UIS.InputChanged:Connect(function(input)
 		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			frame.Position = UDim2.new(
+				startPos.X.Scale,
+				startPos.X.Offset + delta.X,
+				startPos.Y.Scale,
+				startPos.Y.Offset + delta.Y
+			)
 		end
 	end)
 end
 
--- GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LocalScriptExplorer"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = PlayerGui
+local function getPath(obj)
+	local parts = {}
+	local current = obj
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 180, 0, 40)
-toggleButton.Position = UDim2.new(0.02, 0, 0.25, 0)
-toggleButton.Text = "📜 Show All Scripts"
-toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Font = Enum.Font.SourceSansBold
-toggleButton.TextScaled = true
-toggleButton.Parent = screenGui
-makeDraggable(toggleButton)
+	while current and current ~= game do
+		table.insert(parts, 1, current.Name)
+		current = current.Parent
+	end
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0.8, 0, 0.6, 0)
-mainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-mainFrame.Visible = false
-mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame)
-makeDraggable(mainFrame)
+	return "game." .. table.concat(parts, ".")
+end
 
-local searchBox = Instance.new("TextBox")
-searchBox.Size = UDim2.new(1, -60, 0, 30)
-searchBox.Position = UDim2.new(0, 5, 0, 5)
-searchBox.PlaceholderText = "🔍 Search..."
-searchBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-searchBox.TextColor3 = Color3.new(1, 1, 1)
-searchBox.Font = Enum.Font.SourceSans
-searchBox.TextSize = 16
-searchBox.Text = ""
-searchBox.ClearTextOnFocus = false
-searchBox.Parent = mainFrame
+local function newButton(parent, text, size, pos)
+	local btn = Instance.new("TextButton")
+	btn.Size = size
+	btn.Position = pos or UDim2.new()
+	btn.Text = text
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextScaled = true
+	btn.Parent = parent
+	return btn
+end
 
-local tabFrame = Instance.new("Frame")
-tabFrame.Size = UDim2.new(1, 0, 0, 30)
-tabFrame.Position = UDim2.new(0, 0, 0, 35)
-tabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-tabFrame.Parent = mainFrame
+local gui = Instance.new("ScreenGui")
+gui.Name = "LocalScriptExplorerV3"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = PlayerGui
 
-local allScriptsBtn = Instance.new("TextButton")
-allScriptsBtn.Size = UDim2.new(0.5, 0, 1, 0)
-allScriptsBtn.Text = "🧠 All Scripts"
-allScriptsBtn.Font = Enum.Font.SourceSansBold
-allScriptsBtn.TextScaled = true
-allScriptsBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-allScriptsBtn.TextColor3 = Color3.new(1, 1, 1)
-allScriptsBtn.Parent = tabFrame
+local toggle = newButton(
+	gui,
+	"📜 Explorer",
+	UDim2.new(0, 150, 0, 40),
+	UDim2.new(0.02, 0, 0.25, 0)
+)
+toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+makeDraggable(toggle)
 
-local invItemsBtn = Instance.new("TextButton")
-invItemsBtn.Size = UDim2.new(0.5, 0, 1, 0)
-invItemsBtn.Position = UDim2.new(0.5, 0, 0, 0)
-invItemsBtn.Text = "🎒 Inventory"
-invItemsBtn.Font = Enum.Font.SourceSansBold
-invItemsBtn.TextScaled = true
-invItemsBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-invItemsBtn.TextColor3 = Color3.new(1, 1, 1)
-invItemsBtn.Parent = tabFrame
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0.82, 0, 0.65, 0)
+main.Position = UDim2.new(0.09, 0, 0.18, 0)
+main.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+main.Visible = false
+main.Parent = gui
+Instance.new("UICorner", main)
+makeDraggable(main)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -45, 0, 30)
+title.Position = UDim2.new(0, 8, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Local Script Explorer v3"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
+
+local close = newButton(main, "X", UDim2.new(0, 30, 0, 30), UDim2.new(1, -35, 0, 5))
+close.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+
+local search = Instance.new("TextBox")
+search.Size = UDim2.new(1, -15, 0, 32)
+search.Position = UDim2.new(0, 8, 0, 42)
+search.PlaceholderText = "Search by name, class, or path..."
+search.Text = ""
+search.ClearTextOnFocus = false
+search.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+search.TextColor3 = Color3.new(1, 1, 1)
+search.Font = Enum.Font.SourceSans
+search.TextSize = 16
+search.Parent = main
+
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, -15, 0, 32)
+tabBar.Position = UDim2.new(0, 8, 0, 80)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = main
+
+local scriptsTab = newButton(tabBar, "Scripts", UDim2.new(0.25, -4, 1, 0))
+local invTab = newButton(tabBar, "Inventory", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.25, 2, 0, 0))
+local guiTab = newButton(tabBar, "PlayerGui", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.5, 4, 0, 0))
+local refreshBtn = newButton(tabBar, "Refresh", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.75, 6, 0, 0))
+
+local filterBar = Instance.new("Frame")
+filterBar.Size = UDim2.new(1, -15, 0, 28)
+filterBar.Position = UDim2.new(0, 8, 0, 118)
+filterBar.BackgroundTransparency = 1
+filterBar.Parent = main
+
+local allBtn = newButton(filterBar, "All", UDim2.new(0.25, -4, 1, 0))
+local localBtn = newButton(filterBar, "LocalScript", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.25, 2, 0, 0))
+local moduleBtn = newButton(filterBar, "ModuleScript", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.5, 4, 0, 0))
+local serverBtn = newButton(filterBar, "Script", UDim2.new(0.25, -4, 1, 0), UDim2.new(0.75, 6, 0, 0))
+
+local countLabel = Instance.new("TextLabel")
+countLabel.Size = UDim2.new(1, -15, 0, 24)
+countLabel.Position = UDim2.new(0, 8, 0, 150)
+countLabel.BackgroundTransparency = 1
+countLabel.Text = "Found: 0"
+countLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+countLabel.Font = Enum.Font.SourceSans
+countLabel.TextSize = 16
+countLabel.TextXAlignment = Enum.TextXAlignment.Left
+countLabel.Parent = main
 
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -10, 1, -75)
-scroll.Position = UDim2.new(0, 5, 0, 70)
-scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.Size = UDim2.new(1, -15, 1, -182)
+scroll.Position = UDim2.new(0, 8, 0, 175)
+scroll.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 scroll.BorderSizePixel = 0
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.ScrollBarThickness = 8
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-scroll.Parent = mainFrame
+scroll.CanvasSize = UDim2.new()
+scroll.Parent = main
 
 local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 5)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, 4)
 layout.Parent = scroll
 
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.TextScaled = true
-closeBtn.Parent = mainFrame
-closeBtn.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-end)
-
-local backButton = Instance.new("TextButton")
-backButton.Size = UDim2.new(0, 80, 0, 30)
-backButton.Position = UDim2.new(0, 5, 0, 35)
-backButton.Text = "⬅ Back"
-backButton.Font = Enum.Font.SourceSansBold
-backButton.TextScaled = true
-backButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-backButton.TextColor3 = Color3.new(1, 1, 1)
-backButton.Visible = false
-backButton.Parent = mainFrame
-
--- Source Viewer
-local function getSource(scriptObj)
-	local ok, result = pcall(function()
-		if getscriptsource then return getscriptsource(scriptObj)
-		elseif decompile then return decompile(scriptObj)
-		elseif getscriptbytecode then return "-- Bytecode: " .. tostring(getscriptbytecode(scriptObj))
-		else return scriptObj.Source end
-	end)
-	if ok and typeof(result) == "string" and #result > 0 then
-		return result
-	else
-		return "-- Unable to read source. Script may be protected or restricted."
+local function clearList()
+	for _, child in ipairs(scroll:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
 	end
 end
 
-local function showSource(scriptObj)
-	if screenGui:FindFirstChild("SourceViewer") then screenGui.SourceViewer:Destroy() end
+local function setActive()
+	scriptsTab.BackgroundColor3 = currentMode == "scripts" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+	invTab.BackgroundColor3 = currentMode == "inventory" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+	guiTab.BackgroundColor3 = currentMode == "gui" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
 
-	local frame = Instance.new("Frame")
-	frame.Name = "SourceViewer"
-	frame.Size = UDim2.new(0.7, 0, 0.6, 0)
-	frame.Position = UDim2.new(0.15, 0, 0.2, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-	frame.Parent = screenGui
-	Instance.new("UICorner", frame)
-	makeDraggable(frame)
+	allBtn.BackgroundColor3 = filterMode == "all" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+	localBtn.BackgroundColor3 = filterMode == "LocalScript" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+	moduleBtn.BackgroundColor3 = filterMode == "ModuleScript" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+	serverBtn.BackgroundColor3 = filterMode == "Script" and Color3.fromRGB(70, 70, 70) or Color3.fromRGB(40, 40, 40)
+end
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -10, 0, 30)
-	title.Position = UDim2.new(0, 5, 0, 5)
-	title.BackgroundTransparency = 1
-	title.Text = "Viewing: " .. scriptObj.Name
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.Font = Enum.Font.SourceSansBold
-	title.TextScaled = true
-	title.Parent = frame
+local function passesFilter(obj)
+	if filterMode == "all" then
+		return obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("ModuleScript")
+	end
 
-	local scrollFrame = Instance.new("ScrollingFrame")
-	scrollFrame.Size = UDim2.new(1, -10, 1, -40)
-	scrollFrame.Position = UDim2.new(0, 5, 0, 35)
-	scrollFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-	scrollFrame.ScrollBarThickness = 8
-	scrollFrame.ScrollingDirection = Enum.ScrollingDirection.XY
-	scrollFrame.CanvasSize = UDim2.new(0, 2000, 0, 0)
-	scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	scrollFrame.BorderSizePixel = 0
-	scrollFrame.Parent = frame
+	return obj.ClassName == filterMode
+end
 
-	local sourceLabel = Instance.new("TextLabel")
-	sourceLabel.Size = UDim2.new(0, 2000, 0, 0)
-	sourceLabel.BackgroundTransparency = 1
-	sourceLabel.TextColor3 = Color3.new(1, 1, 1)
-	sourceLabel.TextXAlignment = Enum.TextXAlignment.Left
-	sourceLabel.TextYAlignment = Enum.TextYAlignment.Top
-	sourceLabel.Font = Enum.Font.Code
-	sourceLabel.TextWrapped = false
-	sourceLabel.TextSize = 14
-	sourceLabel.AutomaticSize = Enum.AutomaticSize.Y
-	sourceLabel.Text = getSource(scriptObj)
-	sourceLabel.Parent = scrollFrame
+local function showInfo(obj)
+	local old = gui:FindFirstChild("InfoViewer")
+	if old then old:Destroy() end
 
-	scrollFrame.CanvasSize = UDim2.new(0, 2000, 0, sourceLabel.AbsoluteSize.Y + 20)
+	local viewer = Instance.new("Frame")
+	viewer.Name = "InfoViewer"
+	viewer.Size = UDim2.new(0.65, 0, 0.42, 0)
+	viewer.Position = UDim2.new(0.18, 0, 0.3, 0)
+	viewer.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+	viewer.Parent = gui
+	Instance.new("UICorner", viewer)
+	makeDraggable(viewer)
 
-	local close = Instance.new("TextButton")
-	close.Size = UDim2.new(0, 30, 0, 30)
-	close.Position = UDim2.new(1, -35, 0, 0)
-	close.Text = "X"
-	close.TextColor3 = Color3.new(1, 1, 1)
-	close.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
-	close.Font = Enum.Font.SourceSansBold
-	close.TextScaled = true
-	close.Parent = frame
-	close.MouseButton1Click:Connect(function()
-		frame:Destroy()
+	local info = Instance.new("TextLabel")
+	info.Size = UDim2.new(1, -15, 1, -50)
+	info.Position = UDim2.new(0, 8, 0, 42)
+	info.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+	info.TextColor3 = Color3.new(1, 1, 1)
+	info.Font = Enum.Font.Code
+	info.TextSize = 15
+	info.TextXAlignment = Enum.TextXAlignment.Left
+	info.TextYAlignment = Enum.TextYAlignment.Top
+	info.TextWrapped = true
+	info.Text =
+		"Name: " .. obj.Name ..
+		"\nClass: " .. obj.ClassName ..
+		"\nPath: " .. getPath(obj) ..
+		"\nParent: " .. (obj.Parent and obj.Parent.Name or "nil") ..
+		"\n\nSafe mode: this shows object info, not protected script source."
+	info.Parent = viewer
+
+	local copyPath = newButton(viewer, "Copy Path", UDim2.new(0, 110, 0, 30), UDim2.new(0, 8, 0, 6))
+	copyPath.BackgroundColor3 = Color3.fromRGB(0, 90, 0)
+
+	copyPath.MouseButton1Click:Connect(function()
+		if setclipboard then
+			setclipboard(getPath(obj))
+			copyPath.Text = "Copied"
+			task.wait(1)
+			copyPath.Text = "Copy Path"
+		else
+			copyPath.Text = "No Clipboard"
+			task.wait(1)
+			copyPath.Text = "Copy Path"
+		end
 	end)
 
-	local copyButton = Instance.new("TextButton")
-	copyButton.Size = UDim2.new(0, 80, 0, 30)
-	copyButton.Position = UDim2.new(1, -120, 0, 0)
-	copyButton.Text = "📋 Copy"
-	copyButton.TextColor3 = Color3.new(1, 1, 1)
-	copyButton.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
-	copyButton.Font = Enum.Font.SourceSansBold
-	copyButton.TextScaled = true
-	copyButton.Parent = frame
-	copyButton.MouseButton1Click:Connect(function()
-		local ok = pcall(function()
-			setclipboard(sourceLabel.Text)
-		end)
-		copyButton.Text = ok and "✅ Copied!" or "❌ Fail"
-		task.wait(1)
-		copyButton.Text = "📋 Copy"
+	local x = newButton(viewer, "X", UDim2.new(0, 30, 0, 30), UDim2.new(1, -38, 0, 6))
+	x.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+
+	x.MouseButton1Click:Connect(function()
+		viewer:Destroy()
 	end)
 end
+
+local function addRow(obj)
+	local row = Instance.new("TextButton")
+	row.Size = UDim2.new(1, -10, 0, 38)
+	row.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+	row.TextColor3 = Color3.new(1, 1, 1)
+	row.Font = Enum.Font.SourceSans
+	row.TextSize = 15
+	row.TextXAlignment = Enum.TextXAlignment.Left
+	row.Text = "  [" .. obj.ClassName .. "] " .. getPath(obj)
+	row.Parent = scroll
+
+	row.MouseButton1Click:Connect(function()
+		showInfo(obj)
+	end)
+end
+
+local function buildCache()
+	cachedResults = {}
+
+	if currentMode == "scripts" then
+		for _, obj in ipairs(game:GetDescendants()) do
+			if passesFilter(obj) then
+				table.insert(cachedResults, obj)
+			end
+		end
+
+	elseif currentMode == "inventory" then
+		local backpack = LocalPlayer:FindFirstChild("Backpack")
+		local character = LocalPlayer.Character
+
+		if backpack then
+			for _, obj in ipairs(backpack:GetDescendants()) do
+				table.insert(cachedResults, obj)
+			end
+		end
+
+		if character then
+			for _, obj in ipairs(character:GetDescendants()) do
+				table.insert(cachedResults, obj)
+			end
+		end
+
+	elseif currentMode == "gui" then
+		for _, obj in ipairs(PlayerGui:GetDescendants()) do
+			table.insert(cachedResults, obj)
+		end
+	end
+end
+
+local function refresh()
+	if refreshing then return end
+	refreshing = true
+
+	clearList()
+	setActive()
+
+	local query = string.lower(search.Text)
+	local shown = 0
+
+	for _, obj in ipairs(cachedResults) do
+		if shown >= MAX_ROWS then
+			break
+		end
+
+		if obj and obj.Parent then
+			local path = getPath(obj)
+			local text = string.lower(obj.Name .. " " .. obj.ClassName .. " " .. path)
+
+			if query == "" or string.find(text, query, 1, true) then
+				addRow(obj)
+				shown += 1
+			end
+		end
+	end
+
+	countLabel.Text = "Found: " .. shown .. " / " .. #cachedResults
+	refreshing = false
+end
+
+local function fullRefresh()
+	buildCache()
+	refresh()
+end
+
+toggle.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
+
+	if main.Visible then
+		fullRefresh()
+	end
+end)
+
+close.MouseButton1Click:Connect(function()
+	main.Visible = false
+end)
+
+refreshBtn.MouseButton1Click:Connect(fullRefresh)
+
+search:GetPropertyChangedSignal("Text"):Connect(function()
+	if searchDebounce then return end
+	searchDebounce = true
+
+	task.delay(0.25, function()
+		searchDebounce = false
+		refresh()
+	end)
+end)
+
+scriptsTab.MouseButton1Click:Connect(function()
+	currentMode = "scripts"
+	fullRefresh()
+end)
+
+invTab.MouseButton1Click:Connect(function()
+	currentMode = "inventory"
+	fullRefresh()
+end)
+
+guiTab.MouseButton1Click:Connect(function()
+	currentMode = "gui"
+	fullRefresh()
+end)
+
+allBtn.MouseButton1Click:Connect(function()
+	filterMode = "all"
+	fullRefresh()
+end)
+
+localBtn.MouseButton1Click:Connect(function()
+	filterMode = "LocalScript"
+	fullRefresh()
+end)
+
+moduleBtn.MouseButton1Click:Connect(function()
+	filterMode = "ModuleScript"
+	fullRefresh()
+end)
+
+serverBtn.MouseButton1Click:Connect(function()
+	filterMode = "Script"
+	fullRefresh()
+end)
