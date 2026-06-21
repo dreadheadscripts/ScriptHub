@@ -80,40 +80,106 @@ task.spawn(function()
 end)
 
 --// REOPEN BUTTON
-local reopen = Instance.new("TextButton")
-reopen.Size = UDim2.new(0,50,0,50)
-reopen.Position = UDim2.new(0,20,0.5,0)
-
-reopen.Text = "🔥"
-reopen.Font = Enum.Font.GothamBlack
-reopen.TextSize = 22
-
-reopen.BackgroundColor3 = Color3.fromRGB(25,15,35)
-reopen.TextColor3 = Color3.fromRGB(255,255,255)
-
+local reopen = Instance.new("ImageButton")
+reopen.Name = "ReopenButton"
+reopen.Size = UDim2.new(0,40,0,40)
+reopen.Position = UDim2.new(1,-68,0,20)
+reopen.AnchorPoint = Vector2.new(0.5,0.5)
+reopen.Image = "rbxassetid://84147778294140"
+reopen.BackgroundTransparency = 1
 reopen.Visible = false
+reopen.ZIndex = 999
 reopen.Parent = gui
-
-Instance.new("UICorner", reopen).CornerRadius = UDim.new(1,0)
 
 local reopenStroke = Instance.new("UIStroke")
 reopenStroke.Color = Color3.fromRGB(255,0,150)
 reopenStroke.Thickness = 2
 reopenStroke.Parent = reopen
 
+-- pulse
 task.spawn(function()
 	while reopen.Parent do
 		TweenService:Create(reopen, TweenInfo.new(.6), {
-			Size = UDim2.new(0,56,0,56)
+			Size = UDim2.new(0,46,0,46)
 		}):Play()
 
 		task.wait(.6)
 
 		TweenService:Create(reopen, TweenInfo.new(.6), {
-			Size = UDim2.new(0,50,0,50)
+			Size = UDim2.new(0,40,0,40)
 		}):Play()
 
 		task.wait(.6)
+	end
+end)
+
+-- stroke pulse
+task.spawn(function()
+	while reopen.Parent do
+		TweenService:Create(reopenStroke,TweenInfo.new(.8),{
+			Thickness = 4
+		}):Play()
+
+		task.wait(.8)
+
+		TweenService:Create(reopenStroke,TweenInfo.new(.8),{
+			Thickness = 2
+		}):Play()
+
+		task.wait(.8)
+	end
+end)
+
+local draggingReopen = false
+local dragStart
+local startPos
+local startTime
+local moved = false
+
+reopen.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
+		draggingReopen = true
+		moved = false
+		dragStart = input.Position
+		startPos = reopen.Position
+		startTime = tick()
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not draggingReopen then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement
+	and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+	local delta = input.Position - dragStart
+
+	if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
+		moved = true
+	end
+
+	reopen.Position = UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset + delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset + delta.Y
+	)
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
+
+		if draggingReopen then
+			draggingReopen = false
+
+			local heldTime = tick() - startTime
+
+			if not moved and heldTime < 0.25 then
+				main.Visible = true
+				reopen.Visible = false
+			end
+		end
 	end
 end)
 
@@ -384,16 +450,6 @@ close.MouseButton1Click:Connect(function()
 	task.delay(0.08, function()
 		gui:Destroy()
 	end)
-end)
-
-minimize.MouseButton1Click:Connect(function()
-	main.Visible = false
-	reopen.Visible = true
-end)
-
-reopen.MouseButton1Click:Connect(function()
-	main.Visible = true
-	reopen.Visible = false
 end)
 
 --// TAB HOLDER
@@ -851,8 +907,6 @@ end)
 		BackgroundColor3 = btn.BackgroundColor3,
 		TextColor3 = btn.TextColor3
 	}
-    
-
 
     --//click
     btn.MouseButton1Click:Connect(function()
@@ -891,6 +945,7 @@ end)
 
 	return btn
 end
+
 
 --// SCROLL
 local target = 0
@@ -947,12 +1002,21 @@ createTab("comp")
 createTab("rugrat")
 createTab("nutss")
 
---🔥 ADD THIS
 _G.Tabs = {
-    Combat = Tabs["Combat"],
-    Player = Tabs["Player"]
+Combat = Tabs["Combat"],
+Player = Tabs["Player"]
 }
 
 task.spawn(function()
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
+loadstring(game("https://raw.githubusercontent.com/dreadheadscripts/ScriptHub/main/LCRT-hub/esp.lua"))()
 end)
+
+-- minimize button
+minimize.MouseButton1Click:Connect(function()
+	local pos = minimize.AbsolutePosition
+	reopen.Position = UDim2.new(0, pos.X, 0, pos.Y)
+
+	main.Visible = false
+	reopen.Visible = true
+end)
+
