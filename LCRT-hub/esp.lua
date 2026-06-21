@@ -61,7 +61,7 @@ end
 
 --// UI BUTTON (auto injected into your Combat tab)
 local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 200, 0, 40)
+button.Size = UDim2.new(0, 400, 0, 40)
 button.BackgroundColor3 = Color3.fromRGB(40,40,55)
 button.TextColor3 = Color3.fromRGB(255,255,255)
 button.Font = Enum.Font.GothamBold
