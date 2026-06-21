@@ -237,7 +237,7 @@ local function setActive(btn, isActive)
 		activeTweens[btn] = {tween1}
 
 	else
-		btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+		btn.BackgroundColor3 = Color3.fromRGB(91, 210, 55)
 		btn.TextColor3 = Color3.fromRGB(200, 200, 200)
 
 		local stroke = btn:FindFirstChild("ActiveStroke")
