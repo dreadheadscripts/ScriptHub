@@ -25,10 +25,10 @@ local b = Instance.new("Frame")
 b.Size = UDim2.new(0, 420, 0, 200)
 b.Position = UDim2.new(0.5, 0, 0.5, 0)
 b.AnchorPoint = Vector2.new(0.5, 0.5)
-b.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
+b.BackgroundColor3 = Color3.fromRGB(89, 23, 198)
 b.BorderSizePixel = 0
 b.Parent = gui
-Instance.new("UICorner", b).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", b).CornerRadius = UDim.new(0, 20)
 
 --// GLOW BORDER
 local stroke = Instance.new("UIStroke")
