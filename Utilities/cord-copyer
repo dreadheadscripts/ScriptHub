@@ -1,0 +1,253 @@
+-- Colorful Fly + Coordinate GUI
+-- Put in StarterPlayerScripts as a LocalScript
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local flying = false
+local flySpeed = 60
+local keys = {}
+
+local bodyVelocity
+local bodyGyro
+
+local function notify(title, text)
+	pcall(function()
+		StarterGui:SetCore("SendNotification", {
+			Title = title,
+			Text = text,
+			Duration = 3
+		})
+	end)
+end
+
+local function getRoot()
+	local char = player.Character or player.CharacterAdded:Wait()
+	return char:WaitForChild("HumanoidRootPart")
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "LucritFlyCoordsGUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 260, 0, 180)
+main.Position = UDim2.new(0.05, 0, 0.35, 0)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 15)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(170, 80, 255)
+stroke.Parent = main
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 0, 180)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 180, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 180))
+})
+gradient.Rotation = 25
+gradient.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "✨ Lucrit Movement"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+title.Parent = main
+
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0.9, 0, 0, 38)
+flyBtn.Position = UDim2.new(0.05, 0, 0, 45)
+flyBtn.Text = "🪽 Fly: OFF"
+flyBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+flyBtn.TextColor3 = Color3.new(1, 1, 1)
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.TextScaled = true
+flyBtn.Parent = main
+Instance.new("UICorner", flyBtn).CornerRadius = UDim.new(0, 10)
+
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(0.9, 0, 0, 35)
+speedBox.Position = UDim2.new(0.05, 0, 0, 90)
+speedBox.Text = tostring(flySpeed)
+speedBox.PlaceholderText = "Fly Speed"
+speedBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.Font = Enum.Font.GothamBold
+speedBox.TextScaled = true
+speedBox.ClearTextOnFocus = false
+speedBox.Parent = main
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 10)
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.9, 0, 0, 38)
+copyBtn.Position = UDim2.new(0.05, 0, 0, 132)
+copyBtn.Text = "📍 Copy Coordinates"
+copyBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+copyBtn.TextColor3 = Color3.new(1, 1, 1)
+copyBtn.Font = Enum.Font.GothamBold
+copyBtn.TextScaled = true
+copyBtn.Parent = main
+Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 10)
+
+-- Movable
+local dragging = false
+local dragStart
+local startPos
+
+main.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- Inputs
+UIS.InputBegan:Connect(function(input, chatting)
+	if chatting then return end
+	keys[input.KeyCode] = true
+end)
+
+UIS.InputEnded:Connect(function(input)
+	keys[input.KeyCode] = false
+end)
+
+local function startFly()
+	local root = getRoot()
+
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+	bodyVelocity.Velocity = Vector3.zero
+	bodyVelocity.Parent = root
+
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+	bodyGyro.CFrame = root.CFrame
+	bodyGyro.Parent = root
+
+	flying = true
+	flyBtn.Text = "🪽 Fly: ON"
+	notify("Fly Enabled ✅", "Use WASD + Space/Ctrl")
+end
+
+local function stopFly()
+	flying = false
+	flyBtn.Text = "🪽 Fly: OFF"
+
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
+
+	notify("Fly Disabled", "Movement returned to normal.")
+end
+
+flyBtn.MouseButton1Click:Connect(function()
+	if flying then
+		stopFly()
+	else
+		startFly()
+	end
+end)
+
+speedBox.FocusLost:Connect(function()
+	local num = tonumber(speedBox.Text)
+
+	if num then
+		flySpeed = math.clamp(num, 10, 300)
+		speedBox.Text = tostring(flySpeed)
+		notify("Speed Updated ✅", "Fly speed set to " .. flySpeed)
+	else
+		speedBox.Text = tostring(flySpeed)
+	end
+end)
+
+copyBtn.MouseButton1Click:Connect(function()
+	local root = getRoot()
+	local pos = root.Position
+
+	local coords = string.format("X: %.2f, Y: %.2f, Z: %.2f", pos.X, pos.Y, pos.Z)
+
+	if setclipboard then
+		setclipboard(coords)
+		notify("Location Copied ✅", coords)
+	else
+		notify("Location Found", coords)
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if not flying or not bodyVelocity or not bodyGyro then return end
+
+	local camera = workspace.CurrentCamera
+	local move = Vector3.zero
+
+	if keys[Enum.KeyCode.W] then
+		move += camera.CFrame.LookVector
+	end
+
+	if keys[Enum.KeyCode.S] then
+		move -= camera.CFrame.LookVector
+	end
+
+	if keys[Enum.KeyCode.A] then
+		move -= camera.CFrame.RightVector
+	end
+
+	if keys[Enum.KeyCode.D] then
+		move += camera.CFrame.RightVector
+	end
+
+	if keys[Enum.KeyCode.Space] then
+		move += Vector3.new(0, 1, 0)
+	end
+
+	if keys[Enum.KeyCode.LeftControl] then
+		move -= Vector3.new(0, 1, 0)
+	end
+
+	if move.Magnitude > 0 then
+		bodyVelocity.Velocity = move.Unit * flySpeed
+	else
+		bodyVelocity.Velocity = Vector3.zero
+	end
+
+	bodyGyro.CFrame = camera.CFrame
+end)
