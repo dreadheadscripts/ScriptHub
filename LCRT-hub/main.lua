@@ -22,7 +22,7 @@ main.Parent = gui
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 
 local b = Instance.new("Frame")
-b.Size = UDim2.new(0, 380, 0, 360)
+b.Size = UDim2.new(0, 380, 0, 200)
 b.Position = UDim2.new(0.5, 0, 0.5, 0)
 b.AnchorPoint = Vector2.new(0.5, 0.5)
 b.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
