@@ -79,6 +79,44 @@ task.spawn(function()
 	end
 end)
 
+--// REOPEN BUTTON
+local reopen = Instance.new("TextButton")
+reopen.Size = UDim2.new(0,50,0,50)
+reopen.Position = UDim2.new(0,20,0.5,0)
+
+reopen.Text = "🔥"
+reopen.Font = Enum.Font.GothamBlack
+reopen.TextSize = 22
+
+reopen.BackgroundColor3 = Color3.fromRGB(25,15,35)
+reopen.TextColor3 = Color3.fromRGB(255,255,255)
+
+reopen.Visible = false
+reopen.Parent = gui
+
+Instance.new("UICorner", reopen).CornerRadius = UDim.new(1,0)
+
+local reopenStroke = Instance.new("UIStroke")
+reopenStroke.Color = Color3.fromRGB(255,0,150)
+reopenStroke.Thickness = 2
+reopenStroke.Parent = reopen
+
+task.spawn(function()
+	while reopen.Parent do
+		TweenService:Create(reopen, TweenInfo.new(.6), {
+			Size = UDim2.new(0,56,0,56)
+		}):Play()
+
+		task.wait(.6)
+
+		TweenService:Create(reopen, TweenInfo.new(.6), {
+			Size = UDim2.new(0,50,0,50)
+		}):Play()
+
+		task.wait(.6)
+	end
+end)
+
 --// TOPBAR
 --// TOPBAR (UPGRADED)
 local topbar = Instance.new("Frame")
@@ -268,6 +306,27 @@ stroke.Color = Color3.fromRGB(255, 80, 80)
 stroke.Transparency = 0.3
 stroke.Parent = close
 
+--// MINIMIZE BUTTON
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(0, 28, 0, 28)
+minimize.Position = UDim2.new(1, -68, 0, 6)
+minimize.Text = "-"
+minimize.Font = Enum.Font.GothamBold
+minimize.TextSize = 18
+minimize.TextColor3 = Color3.fromRGB(255,255,255)
+minimize.BackgroundColor3 = Color3.fromRGB(35,20,45)
+minimize.AutoButtonColor = false
+minimize.Parent = topbar
+
+Instance.new("UICorner", minimize).CornerRadius = UDim.new(1,0)
+
+local minGrad = Instance.new("UIGradient")
+minGrad.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,150)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(120,0,255))
+}
+minGrad.Parent = minimize
+
 --🔥 PULSE (like arrows)
 task.spawn(function()
 	while close.Parent do
@@ -325,6 +384,16 @@ close.MouseButton1Click:Connect(function()
 	task.delay(0.08, function()
 		gui:Destroy()
 	end)
+end)
+
+minimize.MouseButton1Click:Connect(function()
+	main.Visible = false
+	reopen.Visible = true
+end)
+
+reopen.MouseButton1Click:Connect(function()
+	main.Visible = true
+	reopen.Visible = false
 end)
 
 --// TAB HOLDER
@@ -475,39 +544,146 @@ local function stopAnim(btn)
 	activeTweens[btn] = nil
 end
 
+local function clearActiveEffects(btn)
+	for _, v in pairs(btn:GetChildren()) do
+		if v.Name == "ActiveStroke" or v.Name == "ActiveGradient" or v.Name == "TabFire" or v.Name == "Confetti" then
+			v:Destroy()
+		end
+	end
+end
+
 local function setActive(btn, isActive)
-	stopAnim(btn)
+	clearActiveEffects(btn)
 
 	if isActive then
-		btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+		-- active effects
+	else
+		-- inactive effects
+	end
+end
 
-		-- ⚡ glow stroke
+	-- active background
+	local grad = Instance.new("UIGradient")
+	grad.Name = "ActiveGradient"
+	grad.Rotation = 90
+	grad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,40,40)), -- red
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,0,120)), -- pink
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(120,0,255)) -- purple
+	}
+	grad.Parent = btn
+
+	-- text gradient
+	local textGrad = Instance.new("UIGradient")
+	textGrad.Name = "TextGradient"
+	textGrad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255,60,60)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,180))
+	}
+	textGrad.Parent = btn
+
+	-- glow
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "ActiveStroke"
+	stroke.Thickness = 2
+	stroke.Color = Color3.fromRGB(255,50,50)
+	stroke.Parent = btn
+
+   local function clearActiveEffects(btn)
+	for _, v in ipairs(btn:GetChildren()) do
+		if v.Name == "ActiveStroke"
+		or v.Name == "ActiveGradient"
+		or v.Name == "TextGradient"
+		or v.Name == "TabFire" then
+			v:Destroy()
+		end
+	end
+end
+
+local function setActive(btn, isActive)
+	clearActiveEffects(btn)
+
+	if isActive then
+
+		btn.BackgroundColor3 = Color3.fromRGB(25,15,35)
+		btn.TextColor3 = Color3.new(1,1,1)
+
+		local grad = Instance.new("UIGradient")
+		grad.Name = "ActiveGradient"
+		grad.Rotation = 90
+		grad.Color = ColorSequence.new{
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255,50,50)),
+			ColorSequenceKeypoint.new(.5, Color3.fromRGB(255,0,150)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(120,0,255))
+		}
+		grad.Parent = btn
+
 		local stroke = Instance.new("UIStroke")
 		stroke.Name = "ActiveStroke"
 		stroke.Thickness = 2
-		stroke.Color = Color3.fromRGB(0, 255, 200)
-		stroke.Transparency = 0.3
+		stroke.Color = Color3.fromRGB(255,60,120)
 		stroke.Parent = btn
 
-		-- 🌈 rainbow text loop
 		task.spawn(function()
-			local hue = 0
-			while activeTab and tabButtons[activeTab] == btn do
-				hue += 0.01
-				btn.TextColor3 = Color3.fromHSV(hue % 1, 1, 1)
-				task.wait(0.03)
+			while activeTab and tabButtons[activeTab] == btn and btn.Parent do
+
+				local flame = Instance.new("Frame")
+				flame.Name = "TabFire"
+
+				flame.Size = UDim2.new(
+					0,
+					math.random(4,8),
+					0,
+					math.random(8,16)
+				)
+
+				flame.Position = UDim2.new(
+					math.random(),
+					0,
+					1,
+					0
+				)
+
+				flame.BackgroundColor3 = ({
+					Color3.fromRGB(255,50,50),
+					Color3.fromRGB(255,0,150),
+					Color3.fromRGB(120,0,255)
+				})[math.random(1,3)]
+
+				flame.BorderSizePixel = 0
+				flame.Parent = btn
+
+				Instance.new("UICorner", flame).CornerRadius = UDim.new(1,0)
+
+				TweenService:Create(
+					flame,
+					TweenInfo.new(.4),
+					{
+						Position = UDim2.new(
+							flame.Position.X.Scale,
+							0,
+							0,
+							0
+						),
+						BackgroundTransparency = 1
+					}
+				):Play()
+
+				task.delay(.4,function()
+					if flame then
+						flame:Destroy()
+					end
+				end)
+
+				task.wait(.05)
 			end
 		end)
 
-		-- 💓 pulse animation
-		activeTweens[btn] = {tween1}
-
 	else
-	   btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-	   btn.TextColor3 = Color3.fromRGB(200, 200, 200)
 
-		local stroke = btn:FindFirstChild("ActiveStroke")
-		if stroke then stroke:Destroy() end
+		btn.BackgroundColor3 = Color3.fromRGB(25,15,35)
+		btn.TextColor3 = Color3.fromRGB(220,220,255)
+
 	end
 end
 
@@ -769,7 +945,7 @@ createTab("goon")
 createTab("balll")
 createTab("comp")
 createTab("rugrat")
-createTab("Player")
+createTab("nutss")
 
 --🔥 ADD THIS
 _G.Tabs = {
