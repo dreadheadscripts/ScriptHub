@@ -21,7 +21,7 @@ local function addESP(player)
 
 		local esp = Instance.new("BillboardGui")
 		esp.Name = "ESP"
-		esp.Size = UDim2.new(0, 100, 0, 40)
+		esp.Size = UDim2.new(0, 200, 0, 40)
 		esp.AlwaysOnTop = true
 		esp.Adornee = head
 		esp.Parent = head
